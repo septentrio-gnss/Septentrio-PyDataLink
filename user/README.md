@@ -64,7 +64,7 @@ Or open the windows store and search for python and click on install
 
 ## Install project
 
-Once you've installed python, all you have to do is download the source code and launch the application. 
+Once you've installed python, all you have to do is download the source code and run the application. 
 
 ### Using git clone
 ```

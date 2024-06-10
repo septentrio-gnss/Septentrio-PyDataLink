@@ -52,6 +52,7 @@ Data Link, within the RxTools suite, serves as a graphical communication termina
 # Installation
 As pyDatalink app is entirely developed with python, you must first install python and all its dependencies.
 ## Install Python 
+
 ### Unix Users
 
 1 - Update Package index
@@ -123,6 +124,22 @@ The purpose of the development guide is to explain how the code is structured, h
 |---|
 
 </div>
+
+## Tested Version and Platform
+The current version of pyDatalink has been tested on the following plateform :
+- Raspberry Pi OS 64bit with Desktop
+- Windows 10 *(GUI & CMD only)*
+### Platform
+### Package version
+The current version of pyDatalink has been tested with the following packages version : 
+- Python 3.11.2 
+- pyserial 3.5
+- PySide6 6.7.0 
+- PySide6_Addons 6.7.0
+- PySide6_Essentials 6.7.0
+- shiboken6 6.7.0
+- simple-term-menu 1.6.4
+- typing_extensions 4.11.0
 
 
 
