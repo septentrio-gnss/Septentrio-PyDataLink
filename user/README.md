@@ -105,11 +105,11 @@ The graphical interface is the interface that allows you to perform the most tas
 Use the following command to use pyDatalink in Graphical Interface mode 
 
 ```
-python pyDatalink.py -m GUI
+python pyDatalinkApp.py -m GUI
 ```
 or 
 ```
-python pyDatalink.py
+python pyDatalinkApp.py
 ```
 # Command Line Interface
 <div align="center">
@@ -172,7 +172,7 @@ The project propose a menu-based TUI, providing a semi-graphical way to configur
 
 To start the Data link in TUI mode
 ```
-python pyDatalink.py -m TUI
+python pyDatalinkApp.py -m TUI
 ```
 
 On this menu you can find the following items :

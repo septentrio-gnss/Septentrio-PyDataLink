@@ -184,7 +184,7 @@ pip install -r requirements.txt
 
 By default pyDatalink run as a Graphical interface
 ```
-python pyDatalink.py
+python pyDatalinkApp.py
 ```
 
 # User Manual
