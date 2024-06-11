@@ -43,16 +43,25 @@
 Data Link is a software tool developed by Septentrio and is available as part of the RxTools suite. RxTools is a collection of GUI tools designed for monitoring and configuring Septentrio's receivers, logging data and downloading SBF data files, as well as analyzing and converting SBF data files to different formats.
 
 Data Link, within the RxTools suite, serves as a graphical communication terminal that enables users to establish connections with multiple devices and facilitate data transfer between them.
+
+
+# What is PyDataLink
+Pydatalink is an application whose functions are similar to RxTools' Datalink, but whose special feature is that it is compatible with ARM and x86 systems. The idea of recreating a data link application came from the fact that the current version of Datalink is only compatible with x86 architectures and that cross-compiling it to support other architectures is complex because of the project's various dependencies.
+
+The second major feature of this version is that the code is entirely open source, unlike the Datalink code. The aim of making the project available as open source is to allow the community to contribute to the development of the tool in order to integrate new functionalities.
+
+Translated with DeepL.com (free version)
 <div align="center">
 <img src="doc_sources/pyDatalink.PNG" width="75%">
 </div>
 <br>
 
-
 # Installation
-As pyDatalink app is entirely developed with python, you must first install python and all its dependencies.
-## Install Python 
 
+As pyDatalink app is entirely developed with python, you must first install python and all its dependencies.
+
+## Install Python 
+We recommend using a version of python that is 3.11.2 or higher.
 ### Unix Users
 
 1 - Update Package index
@@ -125,14 +134,15 @@ The purpose of the development guide is to explain how the code is structured, h
 
 </div>
 
-## Tested Version and Platform
+## Informations
+### Tested Platforms
 The current version of pyDatalink has been tested on the following plateform :
-- Raspberry Pi OS 64bit with Desktop
+- Raspberry Pi OS 64bit with Desktop - kernel : 6.6 ( Raspberry pi 4)
 - Windows 10 *(GUI & CMD only)*
-### Platform
-### Package version
+
+### Tested Package version
 The current version of pyDatalink has been tested with the following packages version : 
-- Python 3.11.2 
+- Python 3.11.2 and 3.12.3 
 - pyserial 3.5
 - PySide6 6.7.0 
 - PySide6_Addons 6.7.0
@@ -140,6 +150,7 @@ The current version of pyDatalink has been tested with the following packages ve
 - shiboken6 6.7.0
 - simple-term-menu 1.6.4
 - typing_extensions 4.11.0
+
 
 
 

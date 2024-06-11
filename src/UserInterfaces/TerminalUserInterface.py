@@ -32,7 +32,10 @@ import threading
 import socket
 import sys
 import time
-from simple_term_menu import TerminalMenu 
+try : 
+    from simple_term_menu import TerminalMenu 
+except: 
+    print("WARNING : You are running pyDataLink on a system that doesn't support TUI interface !")
 from ..StreamConfig import DataFlow , StreamMode , Streams , StreamType , PortConfig , BaudRate , Parity , StopBits , ByteSize , SerialSettings
 
 
