@@ -751,7 +751,8 @@ class ShowDataInterface(QDialog):
     def __init__(self,stream : PortConfig) -> None:
         super().__init__()
         self.stream = stream
-        self.setFixedSize(350,300)
+        self.setMinimumSize(350,300)
+        self.setBaseSize(350,300)
         self.setWindowTitle("Data Link Connection " + str(stream.id))
         configureLayout = QVBoxLayout(self)
         self.showDataOutput = QTextEdit()

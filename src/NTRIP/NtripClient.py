@@ -76,7 +76,8 @@ class NtripClient:
             request += "Ntrip-Version: Ntrip/2.0\r\n"
         else : 
             request += "Ntrip-Version: Ntrip/1.0\r\n"
-        request += "Authorization: Basic " +  base64.b64encode((self.ntripSettings.username + ":" + self.ntripSettings.password).encode()).decode() + "\r\n"
+        if self.ntripSettings.auth :
+            request += "Authorization: Basic " +  base64.b64encode((self.ntripSettings.username + ":" + self.ntripSettings.password).encode()).decode() + "\r\n"
         if self.ntripSettings.ntripVersion ==2 : 
             request += "Ntrip-GGA: " + nmeaMessage + "\r\n"
             request += "Connection: close\r\n\r\n"
