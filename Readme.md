@@ -1,6 +1,8 @@
 <div align="center">
 
 # pyDatalink by Septentrio
+
+**Note : This tool is currently under testing. Feel free to provide feedback.**
 ## AUTHORS
   
 | Name | GitHub |
