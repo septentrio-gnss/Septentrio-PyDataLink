@@ -1,7 +1,6 @@
+import threading
 from ..StreamConfig import *
 import copy
-
-import asyncio
 import PySide6.QtAsyncio as QtAsyncio
 from PySide6.QtCore import QSize, Qt , QRegularExpression
 from PySide6.QtGui import QIntValidator , QRegularExpressionValidator,QTextCursor,QAction
@@ -535,14 +534,14 @@ class ConfigureInterface(QDialog) :
         ntripCasterBox = QGroupBox("Ntrip Caster")   
         ntripCasterLayout = QVBoxLayout(ntripCasterBox) 
         
-        hostName = QLineEdit()
-        hostName.setText(self.stream.ntripClient.ntripSettings.host)
+        self.ntriphostName = QLineEdit()
+        self.ntriphostName.setText(self.stream.ntripClient.ntripSettings.host)
         hostNameLabel= QLabel("Host : ")
-        hostNameLabel.setBuddy(hostName)
+        hostNameLabel.setBuddy(self.ntriphostName)
         
         hostNameLayout = QHBoxLayout()
         hostNameLayout.addWidget(hostNameLabel)
-        hostNameLayout.addWidget(hostName)
+        hostNameLayout.addWidget(self.ntriphostName)
         hostNameLayout.setAlignment(Qt.AlignmentFlag.AlignTop)
         ntripCasterLayout.addLayout(hostNameLayout)
         
@@ -566,10 +565,10 @@ class ConfigureInterface(QDialog) :
         # Stream - MountPoint Box
         mountPointBox = QGroupBox("Stream")   
         mountPointBoxLayout = QVBoxLayout(mountPointBox)
-        mountPointList = QComboBox()
-        mountPointList.setPlaceholderText("List unavailable")
+        self.mountPointList = QComboBox()
+        self.mountPointList.setPlaceholderText("List unavailable")
 
-        mountPointBoxLayout.addWidget(mountPointList)
+        mountPointBoxLayout.addWidget(self.mountPointList)
         # TLS
         tlsBox = QGroupBox("TLS")  
         tlsBox.setCheckable(True)
@@ -648,12 +647,12 @@ class ConfigureInterface(QDialog) :
         resultLayout.setAlignment(Qt.AlignmentFlag.AlignTop)
         
         #   SIGNALS
-        hostName.editingFinished.connect(lambda :  self.updateMountpointList(mountPointList , hostName))
-        hostName.editingFinished.emit()
+        self.ntriphostName.editingFinished.connect(lambda :  self.updateMountpointList())
+        self.ntriphostName.editingFinished.emit()
         
         Port.valueChanged.connect(lambda : self.stream.ntripClient.ntripSettings.setPort(Port.value()))
         
-        mountPointList.currentIndexChanged.connect(lambda : self.stream.ntripClient.ntripSettings.setMountpoint(mountPointList.currentData()))
+        self.mountPointList.currentIndexChanged.connect(lambda : self.stream.ntripClient.ntripSettings.setMountpoint(self.mountPointList.currentData()))
         
         authBox.toggled.connect(lambda : self.stream.ntripClient.ntripSettings.setAuth(authBox.isChecked()))
         user.editingFinished.connect(lambda : self.stream.ntripClient.ntripSettings.setUsername(user.text()))
@@ -667,25 +666,28 @@ class ConfigureInterface(QDialog) :
         tlsBox.toggled.connect(lambda : self.stream.ntripClient.ntripSettings.setTls(tlsBox.isChecked()))
         return result
         
-    def updateMountpointList(self, mountPointList: QComboBox, hostName: QLineEdit):
-            mountPointList.clear()
-            if len(hostName.text()) > 0:
+    def updateMountpointList(self):
+            self.mountPointList.clear()
+            self.mountPointList.setPlaceholderText("Waiting for source table ...")
+            threading.Thread(target=self.taskGetNewSourceTable).start()
+            
+    def taskGetNewSourceTable(self):
+        if len(self.ntriphostName.text()) > 0:
                 try:
-                    self.stream.ntripClient.set_Settings_Host(hostName.text())
-                    sourcetable = self.stream.ntripClient.ntripSettings.sourceTable
-                    if len(sourcetable) != 0:
-                        for source in sourcetable:
-                            mountPointList.addItem(source.mountpoint, source.mountpoint)
-                            if self.stream.ntripClient.ntripSettings.mountpoint is not None:
-                                index = mountPointList.findData(self.stream.ntripClient.ntripSettings.mountpoint)
-                            else : 
-                                index : int = 3
-                            mountPointList.setPlaceholderText("")
-                            mountPointList.setCurrentIndex(index)
+                    self.stream.ntripClient.set_Settings_Host(self.ntriphostName.text())
+                    if len(self.stream.ntripClient.ntripSettings.sourceTable) != 0:
+                        for source in self.stream.ntripClient.ntripSettings.sourceTable:
+                                self.mountPointList.addItem(source.mountpoint, source.mountpoint)
+                                if self.stream.ntripClient.ntripSettings.mountpoint is not None:
+                                    index = self.mountPointList.findData(self.stream.ntripClient.ntripSettings.mountpoint)
+                                else : 
+                                    index : int = 3
+                                self.mountPointList.setPlaceholderText("")
+                                self.mountPointList.setCurrentIndex(index)           
                 except:
-                    mountPointList.setPlaceholderText("List unavailable")
-            else:
-                mountPointList.setPlaceholderText("List unavailable")
+                    self.mountPointList.setPlaceholderText("List unavailable")
+        else:
+                self.mountPointList.setPlaceholderText("List unavailable")
             
     def bottomButtonLayout(self):
                 
@@ -730,7 +732,6 @@ class ConfigureInterface(QDialog) :
                     inputWidget.setDisabled(False)
                     inputWidget.setText(fileName[0])
                 except : 
-                    print("problem")
                     checkbox.click()
                     inputWidget.setDisabled(True)
             else: 
@@ -744,8 +745,6 @@ class ConfigureInterface(QDialog) :
                 if fileName[1] in [ ".cer", ".crt", ".pem"  ,".key"] :
                     self.stream.ntripClient.ntripSettings.setCert(fileName[0])
                     self.cert.setText(fileName[0])
-
-
 class ShowDataInterface(QDialog):
 
     def __init__(self,stream : PortConfig) -> None:
