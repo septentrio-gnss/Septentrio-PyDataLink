@@ -32,6 +32,7 @@ import configparser
 import socket
 from .NtripSourceTable import NtripSourceTable
 import ssl
+import logging
 
 
 class InvalidHostnameError(Exception):
@@ -56,7 +57,7 @@ class NtripSettings:
     """
 
     def __init__(self , host : str = "" , port : int = 2101 ,auth : bool = False, username : str = "" , password : str = "",
-                 mountpoint : str = "" , tls : bool = False , fixedPos : bool = False , latitude : str = "00.000000000" , longitude : str = "000.000000000" , height : int = 0) -> None:
+                 mountpoint : str = "" , tls : bool = False , fixedPos : bool = False , latitude : str = "00.000000000" , longitude : str = "000.000000000" , height : int = 0 , logFile : logging  = None) -> None:
         """
         Initializes a new instance of the NTRIPSettings class.
         """
@@ -72,8 +73,6 @@ class NtripSettings:
         self.cert : str = ""
         
         self.ntripVersion : int = 2
-        
-        
 
         # Fixed Position GGA
         self.fixedPos : bool = fixedPos
@@ -82,9 +81,14 @@ class NtripSettings:
         self.height : int = height
             
         self.sourceTable : list[NtripSourceTable] = None
+        
+        # Support Log
+        self.logFile : logging = logFile
             
     def connect(self):    
             if len(self.host) == 0:
+                if self.logFile is not None : 
+                    self.logFile.error("Invalid Hostname : hostname empty")
                 raise InvalidHostnameError()            
             if self.tls : 
                 ntripsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -99,8 +103,12 @@ class NtripSettings:
                     wrappedSocket.connect((self.host, self.port))
                     return wrappedSocket
                 except TimeoutError as e:
+                    if self.logFile is not None :
+                        self.logFile.error("Error during the handshake for TLS connection : %s" ,  e)
                     raise FailedHandshakeError()
                 except Exception as e :
+                    if self.logFile is not None : 
+                        self.logFile.error("Failed to open TLS socket : %s", e)
                     raise e 
             else : 
                 try:
@@ -108,6 +116,8 @@ class NtripSettings:
                     ntripsocket.connect((self.host, self.port))
                     return ntripsocket
                 except Exception as e:
+                    if self.logFile is not None :
+                        self.logFile.error("Failed to open socket : %s", e )
                     raise ConnectFailedError(e)
 
 
@@ -244,7 +254,7 @@ class NtripSettings:
     def SaveConfig(self , sectionName : str,SaveConfigFile  : configparser.ConfigParser):
         SaveConfigFile.set(sectionName,"NTRIP.hostname",str(self.host))
         SaveConfigFile.set(sectionName,"NTRIP.portnumber",str(self.port))
-        SaveConfigFile.set(sectionName,"NTRIP.mountPoint",self.mountpoint)
+        SaveConfigFile.set(sectionName,"NTRIP.mountPoint",str(self.mountpoint))
         SaveConfigFile.set(sectionName,"NTRIP.authenticationenabled", str(self.auth))
         SaveConfigFile.set(sectionName,"NTRIP.user",str(self.username))
         SaveConfigFile.set(sectionName,"NTRIP.password",str(base64.b64encode((self.password).encode()).decode()))

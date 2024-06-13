@@ -46,6 +46,7 @@ from .UdpSettings import *
 from .SerialSettings import *
 from .TcpSettings import *
 from .Preferences import *
+from ..constants import *
 
 class StreamType(Enum):
     Serial = 0
@@ -63,7 +64,7 @@ def Task_UpdateLinkedPort(updateLinkedPort : queue.Queue , LinkedPort : list[int
                         LinkedPort.append(port)
         return LinkedPort
 def Task_SendCommand(linkedData : queue.Queue , Stream , ShowData : bool = False , udpsendaddress : str = None 
-                     , DataToShow : queue.Queue = None , logger : logging = None , lineTermination : str = "\r\n"):
+                     , DataToShow : queue.Queue = None , logger : logging.Logger = None , lineTermination : str = "\r\n"):
     try : 
         for _ in range(linkedData.qsize()):
             outputData : str = linkedData.get()
@@ -93,7 +94,7 @@ class PortConfig:
     """
 
     def __init__(self, id: int = 0, linkedData: list[queue.Queue] = None ,confFile : configparser.SectionProxy = None  
-                 , commandLineConfig : str = None ):
+                 , commandLineConfig : str = None , logFile : logging.Logger = None ):
 
         self.id = id
         self.linkedPort: list[int] = []
@@ -104,6 +105,9 @@ class PortConfig:
         self.lineTermination :str = "\r\n"
         self.dataTransferInput : float = 0.0
         self.dataTransferOutput :float = 0.0
+        
+        #Support Log File 
+        self.logFile : logging.Logger = logFile
         
         # logging file 
         self.logging : bool = False
@@ -137,10 +141,12 @@ class PortConfig:
         elif commandLineConfig is not None :
             self.CommandLineConfig(commandLineConfig)       
         else:
-            self.serialSettings = SerialSettings()
-            self.tcpSettings = TcpSettings()
-            self.udpSettings = UdpSettings()
-            self.ntripClient = NtripClient()
+            self.serialSettings = SerialSettings(logFile =  self.logFile )
+            self.tcpSettings = TcpSettings(logFile =  self.logFile )
+            self.udpSettings = UdpSettings(logFile = self.logFile )
+            self.ntripClient = NtripClient(logFile= self.logFile )
+            
+        
 
     
         
@@ -154,8 +160,12 @@ class PortConfig:
         Returns:
             int: 0 if the Stream fails, otherwise None.
         """
+        if self.logFile is not None : 
+            self.logFile.info("Connecting Stream %s " , self.id)
         if Streamtype is None : 
             Streamtype = self.StreamType
+            if self.logFile is not None : 
+                self.logFile.info("Stream %s : start new %s Stream" , self.id , Streamtype.name)
         if self.connected is not True:
             if Streamtype == StreamType.Serial:
                 if self.serialSettings.port != "":
@@ -163,14 +173,21 @@ class PortConfig:
                         self.Stream = self.serialSettings.Connect()
                         self.connected = True
                         task = self.DatalinkSerialTask
-                        self.StreamType = Streamtype
+                        if self.logFile is not None : 
+                            self.logFile.info("Stream %s : Stream openned succesfully " , self.id)
                     except Exception as e:
+                        if self.logFile is not None : 
+                            self.logFile.error("Stream %s : Failed to connect to the serial port : %s" , self.id,e)
                         self.Stream = None
                         self.connected = False
                         raise e
                 else:
+                    if self.logFile is not None : 
+                        self.logFile.error("Stream %s : Failed to open Serial stream : Serial port hasn't been configured yet" , self.id)
                     raise Exception("Connection Error","Serial port hasn't been configured yet")
             elif Streamtype == StreamType.TCP:
+                if self.logFile is not None : 
+                    self.logFile.debug("Stream %s : Create TCP %s with host : %s and port : %s" , self.id,self.StreamType.name,self.tcpSettings.host , self.tcpSettings.port)
                 if self.tcpSettings is not None:
                     try:
                         socket.gethostbyname(self.tcpSettings.host)
@@ -180,31 +197,34 @@ class PortConfig:
                             task = self.DatalinkTCPServerTask
                         else :
                             task = self.DatalinkTCPClientTask
-                        self.StreamType = Streamtype
-                    except socket.gaierror as e:
-                        self.Stream = None
-                        self.connected = False
-                        raise e
-                    except ConnectionRefusedError as e:
-                        self.Stream = None
-                        self.connected = False
-                        raise e
+                        if self.logFile is not None : 
+                            self.logFile.info("Stream %s : Stream openned succesfully " , self.id)
                     except Exception as e :
                         self.Stream = None
                         self.connected = False
+                        if self.logFile is not None : 
+                            self.logFile.error("Stream %s : Failed to open TCP stream: %s" , self.id,e)
                         raise e
                 else:
+                    if self.logFile is not None : 
+                            self.logFile.error("Stream %s : Failed to open TCP stream : TCP settings not set " , self.id)
                     raise Exception("Connection Error","tcp settings are empty !")
             elif Streamtype == StreamType.UDP:
                 if self.udpSettings is not None:
                     try:
                         socket.gethostbyname(self.tcpSettings.host)
                         self.Stream = self.udpSettings.connect()
+                        if self.logFile is not None : 
+                            self.logFile.info("Stream %s : Stream openned succesfully " , self.id)
                     except Exception as e:
                         self.Stream = None
                         self.connected = False
+                        if self.logFile is not None : 
+                            self.logFile.error("Stream %s : Failed to open TCP stream: %s" , self.id,e)
                         raise e
                 else:
+                    if self.logFile is not None : 
+                            self.logFile.error("Stream %s : Failed to open UDP stream : UDP settings not set " , self.id)
                     raise Exception("Connection Error","udp settings are empty!")
             elif Streamtype == StreamType.NTRIP:
                     if self.ntripClient is not None:
@@ -213,57 +233,91 @@ class PortConfig:
                                 socket.gethostbyname(self.ntripClient.ntripSettings.host)
                                 self.ntripClient.connect()
                                 self.Stream = self.ntripClient
-                                self.StopEvent.clear()
                                 self.connected = True
-                                task = self.DatalinkNTRIPTask
-                                self.StreamType = Streamtype   
+                                task = self.DatalinkNTRIPTask   
                                 if self.ntripClient.ntripSettings.fixedPos:
                                     self.ntripClient._createGgaString()
+                                    
+                                if self.logFile is not None : 
+                                    self.logFile.info("Stream %s : Stream openned succesfully " , self.id)
                             else:
+                                if self.logFile is not None : 
+                                    self.logFile.error("Stream %s : Failed to open NTRIP stream : NTRIP Host Name not set " , self.id)
                                 raise Exception("Connection Error","NTRIP host is not set !")
                         except Exception as e:
+                            if self.logFile is not None : 
+                                self.logFile.error("Stream %s : Failed to open NTRIP stream: %s" , self.id,e)
                             self.Stream = None
                             self.connected = False 
                             raise e
                     else:
+                        if self.logFile is not None : 
+                            self.logFile.error("Stream %s : Failed to open NTRIP stream : NTRIP settings not set " , self.id)
                         raise Exception("Connection Error","ntrip client is not set !")
             else:
+                if self.logFile is not None : 
+                    self.logFile.error("Stream %s : Invalid Stream Type " , self.id)
                 raise Exception("Connection Error","Invalid Stream type!")
             if self.connected is True:
                 try:
-                    
+                    if self.logFile is not None : 
+                        self.logFile.debug("Stream %s : start final configuration " , self.id)
                     self.StopEvent.clear()
                     if self.logging :
-                        self.logger = logging.getLogger(self.loggingFile)
+                        self.logger = logging.getLogger(f"Stream{self.id}Log")
+                        self.logger.basicConfig(filename=self.loggingFile , format="")
+                        if self.logFile is not None : 
+                            self.logFile.debug("Stream %s : init loggin file :  %s" , self.id,self.loggingFile)
                     if self.sendStartupScript:
+                        if self.logFile is not None : 
+                            self.logFile.debug("Stream %s : init startup script file :  %s" , self.id,self.startupScript)
                         self._clearQueue(self.linkedData[self.id])
                         self.sendScript(self.linkedData[self.id], True)
                     self.dataLinkStreamThread = threading.Thread(target=task,args=(self.Stream, self.linkedData, self.updateLinkedPort,self.DataToShow))
+                    if self.logFile is not None : 
+                            self.logFile.debug("Stream %s : Starting Thread " , self.id)
                     self.dataLinkStreamThread.start()  
                     self.currentTask = task
-                    if len(self.linkedPort) != 0:    
+                    if len(self.linkedPort) != 0:
+                        if self.logFile is not None :
+                            self.logFile.error("Stream %s : update linked Port : %s" , self.id ,str(self.linkedPort) )
                         for link in self.linkedPort:  
                             self.updateLinkedPort.put(link)
+                    if self.logFile is not None :
+                            self.logFile.error("Stream %s : final configuration finished " , self.id  )
                 except Exception as e:
+                    if self.logFile is not None :
+                        self.logFile.info("Stream %s : Failed during final configuration : %s" , self.id ,e )
                     self.connected = False
                     raise e
+        else : 
+            if self.logFile is not None : 
+                self.logFile.error("Stream %s : Stream was already connected",self.id)
 
     def Disconnect(self):
         """
         Disconnects the port if is connected.
         """
         if self.Stream is not None:
+            if self.logFile is not None : 
+                self.logFile.info("Stream %s : Disconnecting stream",self.id)
             try:
                 if self.sendCloseScript:
                     self.sendScript(self.linkedData[self.id], False)
                 self.StopEvent.set()
                 self.currentTask = None
                 self.dataLinkStreamThread.join()
+                if self.logFile is not None : 
+                    self.logFile.debug("Stream %s : wait for Thread to stop",self.id)
                 self.Stream.close()
                 self.connected = False
                 self.dataTransferInput = 0.0
                 self.dataTransferOutput = 0.0
+                if self.logFile is not None : 
+                    self.logFile.info("Stream %s : Disconnected",self.id)
             except Exception as e:
+                if self.logFile is not None : 
+                    self.logFile.error("Stream %s : Failed to disconnect stream : %s",self.id,e)
                 raise e
       
     def UpdatelinkedPort(self, link : int):
@@ -275,8 +329,12 @@ class PortConfig:
 
         """
         if link in self.linkedPort:
+            if self.logFile is not None : 
+                    self.logFile.info("Stream %s : remove link : %s",self.id,link)
             self.linkedPort.remove(link)
         else:
+            if self.logFile is not None : 
+                    self.logFile.info("Stream %s : add link : %s",self.id,link)
             self.linkedPort.append(link)
         if self.connected :
             self.updateLinkedPort.put(link)
@@ -308,21 +366,36 @@ class PortConfig:
         Raises:
             Exception: Error while opening script file 
         """
+        
         try : 
             if startup :
+                if self.logFile is not None : 
+                    self.logFile.info("Stream %s : send Startup script command",self.id)
                 if self.startupScript != "":
+                    if self.logFile is not None : 
+                        self.logFile.debug("Stream %s : open Startup script file",self.id)
                     OpenScript = open(self.startupScript,"r")
                     if OpenScript is not None:
+                        if self.logFile is not None : 
+                            self.logFile.debug("Stream %s : file not empty , send command to thread",self.id)
                         for line in OpenScript:
                             queue.put(line)
             else :
-                 if self.closeScript != "":
+                if self.logFile is not None : 
+                    self.logFile.info("Stream %s : send closeup script command",self.id)
+                if self.closeScript != "":
+                    if self.logFile is not None : 
+                        self.logFile.debug("Stream %s : open closeup script file",self.id)
                     OpenScript = open(self.closeScript,"r")
                     if OpenScript is not None:
+                        if self.logFile is not None : 
+                            self.logFile.debug("Stream %s : file not empty , send command to thread",self.id)
                         for line in OpenScript:
                             queue.put(line)
                 
         except Exception as e:
+            if self.logFile is not None : 
+                    self.logFile.error("Stream %s : failed to send script command to thread : %s",self.id,e)
             raise Exception("Error : couldn't open the script file " + e)
     
     def sendCommand(self, CMD :str):    
@@ -391,6 +464,8 @@ class PortConfig:
         if os.path.exists(newpath) :
             self.closeScript = newpath
         else : 
+            if self.logFile is not None : 
+                self.logFile.error("Stream %s : Closeup file not found : %s",self.id,newpath)
             raise Exception("File not found !")
         
     def setStartupScriptPath(self,newpath :str ):
@@ -405,6 +480,8 @@ class PortConfig:
         if os.path.exists(newpath) :
             self.startupScript = newpath
         else : 
+            if self.logFile is not None : 
+                self.logFile.error("Stream %s : Startup file not found : %s",self.id,newpath)
             raise Exception("File not found !")
         
     def setLoggingFileName(self,newFileName : str):
@@ -414,9 +491,13 @@ class PortConfig:
         Args:
             newFileName (str): the new file name of the logging file
         """
-        if os.path.exists("./log"):
-            os.makedirs("./log")
-        self.loggingFile = newFileName
+        if os.path.exists(newFileName):
+            self.loggingFile = newFileName
+        else : 
+            if self.logFile is not None : 
+                self.logFile.error("Stream %s : Logging file Path not found : %s",self.id,newFileName)
+            raise Exception("Path not found !")
+            
         
     def setStreamType(self,newStreamType : StreamType):
         """
@@ -473,16 +554,24 @@ class PortConfig:
         tempInputTranfert = 0
         tempOutputTransfert = 0
         # Send startup command
+        if self.logFile is not None :
+            self.logFile.info(f"Stream {self.id} : Task Started " )
+            self.logFile.info(f"Stream {self.id} : sending startup script" )
         try:
             if not linkedData[self.id].empty():
                 Task_SendCommand(linkedData[self.id],serial,logger=self.logger,lineTermination=self.lineTermination)
         except Exception as e :
+            if self.logFile is not None :
+                    self.logFile.error(f"Stream {self.id} :  Start script couldn't finish : {e} " )
             self._ExceptionDisconnect()
             raise Exception("Error : Start script couldn't finish " + e)
-        currentTime = datetime.now()
+        currentTime = datetime.datetime.now()
         #Main loop
+        if self.logFile is not None :
+            self.logFile.info(f"Stream {self.id} : sending startup script finished  " )
+            self.logFile.info(f"Stream {self.id} : start main loop" )
         while self.StopEvent.is_set() is not True:
-            now = datetime.now()
+            now = datetime.datetime.now()
             if (now-currentTime).total_seconds() >=  1 : 
                 currentTime = now 
                 self.dataTransferInput = round(tempInputTranfert/1000,1)
@@ -507,15 +596,22 @@ class PortConfig:
                             tempOutputTransfert += Task_SendCommand(linkedData[self.id],serial,self.ShowOutputData.is_set(), DataToShow=dataToShow,logger=self.logger,lineTermination=self.lineTermination )
             except Exception as e:
                 self._ExceptionDisconnect()
+                if self.logFile is not None :
+                    self.logFile.error(f"Stream {self.id} {self.StreamType} has been disconnected, error: {e}")
                 raise Exception(f"Stream {self.id} {self.StreamType} has been disconnected, error: {e}")
             #Update current linked Streams list
             if not updateLinkedPort.empty():
                 Task_UpdateLinkedPort(updateLinkedPort , LinkedPort)
         #Send closeup commands
+        if self.logFile is not None :
+            self.logFile.info(f"Stream {self.id} : main loop ended " )
+            self.logFile.info(f"Stream {self.id} : sending closing script" )
         try : 
             if not linkedData[self.id].empty():
                 Task_SendCommand(linkedData[self.id],serial,logger=self.logger,lineTermination=self.lineTermination)
         except Exception as e :
+            if self.logFile is not None :
+                    self.logFile.error(f"Stream {self.id} :  closing script couldn't finish : {e} " )
             raise Exception("Error : closing script couldn't finish " + e)
         return 0
 
@@ -531,6 +627,9 @@ class PortConfig:
         tempInputTranfert = 0
         tempOutputTransfert = 0
         # Wait for a client to connect to the server
+        if self.logFile is not None :
+            self.logFile.info(f"Stream {self.id} : Task Started " )
+            self.logFile.info(f"Stream {self.id} : waiting for client to connect " )
         while True:
                 try:
                     tcp.listen()
@@ -541,16 +640,23 @@ class PortConfig:
                     if self.StopEvent.is_set():
                         return 0
         # Send startup command
+        if self.logFile is not None :
+            self.logFile.info(f"Stream {self.id} : sending startup script" )
         try:
             if not linkedData[self.id].empty():
                 Task_SendCommand(linkedData[self.id],conn,logger=self.logger,lineTermination=self.lineTermination)
         except Exception as e :
+            if self.logFile is not None :
+                    self.logFile.error(f"Stream {self.id} :  Start script couldn't finish : {e} " )
             self._ExceptionDisconnect()
             raise Exception("Error : Start script couldn't finish " + e)
-        currentTime = datetime.now()
+        currentTime = datetime.datetime.now()
         #Main loop
+        if self.logFile is not None :
+            self.logFile.info(f"Stream {self.id} : sending startup script finished  " )
+            self.logFile.info(f"Stream {self.id} : start main loop" )
         while self.StopEvent.is_set() is not True:
-            now = datetime.now()
+            now = datetime.datetime.now()
             if (now-currentTime).total_seconds() >=  1 : 
                 currentTime = now 
                 self.dataTransferInput = round(tempInputTranfert/1000,1)
@@ -585,28 +691,38 @@ class PortConfig:
                 else : 
                     time.sleep(1)
                     #Wait for a new Client if the current one has disconnect
-                    
+                    if self.logFile is not None :
+                                self.logFile.info(f"Stream {self.id} : Client disconnected  {e}")
                     while True:
                         try:
+                           
                             tcp.listen()
                             conn, address = tcp.accept()
                             conn.settimeout(0.1)
+                            if self.logFile is not None :
+                                self.logFile.info(f"Stream {self.id} : new Client Connected  {e}")
                             break
                         except Exception as e:
                             if self.StopEvent.is_set():
-                                print("end")
                                 return 0
             except Exception as e:
                 self._ExceptionDisconnect()
+                if self.logFile is not None :
+                    self.logFile.error(f"Stream {self.id} {self.StreamType} has been disconnected, error: {e}")
                 raise Exception(f"Stream {self.id} {self.StreamType} has been disconnected, error: {e}")
             #Update current linked Streams list
             if not updateLinkedPort.empty():
                 LinkedPort = Task_UpdateLinkedPort(updateLinkedPort , LinkedPort)
         #Send closeup commands
+        if self.logFile is not None :
+            self.logFile.info(f"Stream {self.id} : main loop ended " )
+            self.logFile.info(f"Stream {self.id} : sending closing script" )
         try : 
             if not linkedData[self.id].empty():
                Task_SendCommand(linkedData[self.id],conn,logger=self.logger,lineTermination=self.lineTermination)
         except Exception as e :
+            if self.logFile is not None :
+                    self.logFile.error(f"Stream {self.id} :  closing script couldn't finish : {e} " )
             raise Exception("Error : closing script couldn't finish " + e)
         return 0
     
@@ -622,17 +738,24 @@ class PortConfig:
         tempInputTranfert = 0
         tempOutputTransfert = 0
         #Send startup command
+        if self.logFile is not None :
+            self.logFile.info(f"Stream {self.id} : Task Started " )
+            self.logFile.info(f"Stream {self.id} : sending startup script" )
         try:
             if not linkedData[self.id].empty():
                 Task_SendCommand(linkedData[self.id],tcp,logger=self.logger,lineTermination=self.lineTermination)
         except Exception as e :
-                        self._ExceptionDisconnect()
-                        self.connected = False
-                        raise Exception("Error : Start script couldn't finish " + e)
-        currentTime = datetime.now()
+            if self.logFile is not None :
+                    self.logFile.error(f"Stream {self.id} :  Start script couldn't finish : {e} " )
+            self._ExceptionDisconnect()
+            raise Exception("Error : Start script couldn't finish " + e)
+        currentTime = datetime.datetime.now()
         #Main loop
+        if self.logFile is not None :
+            self.logFile.info(f"Stream {self.id} : sending startup script finished  " )
+            self.logFile.info(f"Stream {self.id} : start main loop" )
         while self.StopEvent.is_set() is not True:
-            now = datetime.now()
+            now = datetime.datetime.now()
             if (now-currentTime).total_seconds() >=  1 : 
                 currentTime = now 
                 self.dataTransferInput = round(tempInputTranfert/1000,1)
@@ -681,15 +804,22 @@ class PortConfig:
             #If there is any probleme , disconnect everything and kill thread 
             except Exception as e:
                 self._ExceptionDisconnect()
+                if self.logFile is not None :
+                    self.logFile.error(f"Stream {self.id} {self.StreamType} has been disconnected, error: {e}")
                 raise Exception(f"Stream {self.id} {self.StreamType} has been disconnected, error: {e}")
             
             # Update Current linked Stream list
             if not updateLinkedPort.empty():
                 Task_UpdateLinkedPort(updateLinkedPort,LinkedPort)
         # Send Closeup command
+        if self.logFile is not None :
+            self.logFile.info(f"Stream {self.id} : main loop ended " )
+            self.logFile.info(f"Stream {self.id} : sending closing script" )
         try : 
             Task_SendCommand(linkedData[self.id],tcp,logger=self.logger,lineTermination=self.lineTermination)
         except Exception as e :
+            if self.logFile is not None :
+                    self.logFile.error(f"Stream {self.id} :  closing script couldn't finish : {e} " )
             raise Exception("Error : closing script couldn't finish " + e)
         return 0
                     
@@ -706,17 +836,25 @@ class PortConfig:
         else:
             sendaddress = ('', self.udpSettings.port)
         #Send Startup command
+        if self.logFile is not None :
+            self.logFile.info(f"Stream {self.id} : Task Started " )
+            self.logFile.info(f"Stream {self.id} : sending startup script" )
         try:
             if not linkedData[self.id].empty():
                 if sendaddress is not None:
                     Task_SendCommand(linkedData[self.id] , Stream=udp , udpsendaddress=sendaddress,logger=self.logger,lineTermination=self.lineTermination)
         except Exception as e :
+            if self.logFile is not None :
+                    self.logFile.error(f"Stream {self.id} :  Start script couldn't finish : {e} " )
             self._ExceptionDisconnect()
             raise Exception("Error : Start script couldn't finish " + e)
-        currentTime = datetime.now()
+        currentTime = datetime.datetime.now()
         #Main loop
+        if self.logFile is not None :
+            self.logFile.info(f"Stream {self.id} : sending startup script finished  " )
+            self.logFile.info(f"Stream {self.id} : start main loop" )
         while self.StopEvent.is_set() is not True:
-            now = datetime.now()
+            now = datetime.datetime.now()
             if (now-currentTime).total_seconds() >=  1 : 
                 currentTime = now 
                 self.dataTransferInput = round(tempInputTranfert/1000,1)
@@ -746,16 +884,23 @@ class PortConfig:
                                 tempOutputTransfert+= Task_SendCommand(linkedData[self.id] , udp , self.ShowOutputData.is_set() , sendaddress, dataToShow,logger=self.logger,lineTermination=self.lineTermination)
             except Exception as e:
                 self._ExceptionDisconnect()
+                if self.logFile is not None :
+                    self.logFile.error(f"Stream {self.id} {self.StreamType} has been disconnected, error: {e}")
                 raise Exception(f"Stream {self.id} {self.StreamType.name} has been disconnected, error: {e}")
             #Update linked Streams list
             if not updateLinkedPort.empty():
                 Task_UpdateLinkedPort(updateLinkedPort,LinkedPort)
         #Send closeup Commands
+        if self.logFile is not None :
+            self.logFile.info(f"Stream {self.id} : main loop ended " )
+            self.logFile.info(f"Stream {self.id} : sending closing script" )
         try : 
             if not linkedData[self.id].empty():
                 if sendaddress is not None:
                     Task_SendCommand(linkedData[self.id] ,Stream= udp  , udpsendaddress=sendaddress,logger=self.logger,lineTermination=self.lineTermination)
         except Exception as e :
+            if self.logFile is not None :
+                    self.logFile.error(f"Stream {self.id} :  closing script couldn't finish : {e} " )
             raise Exception("Error : closing script couldn't finish " + e)
         return 0
     
@@ -774,18 +919,26 @@ class PortConfig:
         tempInputTranfert = 0
         tempOutputTransfert = 0
         # Send startup command
+        if self.logFile is not None :
+            self.logFile.info(f"Stream {self.id} : Task Started " )
+            self.logFile.info(f"Stream {self.id} : sending startup script" )
         try:
             if self.ntripClient.ntripSettings.fixedPos :
                 linkedData[self.id].put(self.ntripClient.fixedPosGga)
             if not linkedData[self.id].empty():
                 Task_SendCommand(linkedData[self.id],ntrip ,logger=self.logger,lineTermination=self.lineTermination)
         except Exception as e :
+            if self.logFile is not None :
+                    self.logFile.error(f"Stream {self.id} :  Start script couldn't finish : {e} " )
             self._ExceptionDisconnect()
             raise Exception("Error : Start script couldn't finish " + e)         
-        currentTime = datetime.now()
+        currentTime = datetime.datetime.now()
         #Main loop
+        if self.logFile is not None :
+            self.logFile.info(f"Stream {self.id} : sending startup script finished  " )
+            self.logFile.info(f"Stream {self.id} : start main loop" )
         while self.StopEvent.is_set() is not True:
-            now = datetime.now()
+            now = datetime.datetime.now()
             if (now-currentTime).total_seconds() >=  1 : 
                 currentTime = now 
                 self.dataTransferInput = round(tempInputTranfert/1000,1)
@@ -813,7 +966,6 @@ class PortConfig:
                             portQueue.put(inputData)
                     #Send output data comming from other streams and print data if showdata is set
                     if not linkedData[self.id].empty():
-                        print("not empty")
                         tempOutputTransfert+= Task_SendCommand(linkedData[self.id],ntrip ,self.ShowOutputData.is_set(),DataToShow=dataToShow,logger=self.logger,lineTermination=self.lineTermination)
                         
             except Exception as e:
@@ -823,12 +975,16 @@ class PortConfig:
             #Update current linked Streams list
             if not updateLinkedPort.empty():
                 Task_UpdateLinkedPort(updateLinkedPort,LinkedPort)
+        if self.logFile is not None :
+            self.logFile.info(f"Stream {self.id} : main loop ended " )
+            self.logFile.info(f"Stream {self.id} : sending closing script" )
         #Send closeup commands
         try : 
             if not linkedData[self.id].empty():
                 Task_SendCommand(linkedData[self.id],ntrip,logger=self.logger,lineTermination=self.lineTermination)
         except Exception as e :
-            self._ExceptionDisconnect()
+            if self.logFile is not None :
+                    self.logFile.error(f"Stream {self.id} :  closing script couldn't finish : {e} " )
             raise Exception("Error : closing script couldn't finish " + e) 
         return 0
 
@@ -1007,11 +1163,11 @@ class PortConfig:
         Args:
             confFile (configparser.SectionProxy): section of a stream in a configuration file
         """
-        self.serialSettings: SerialSettings = ConfFileSerial(confFile)
-        self.tcpSettings: TcpSettings = ConfFileTCP(confFile)
+        self.serialSettings: SerialSettings = ConfFileSerial(confFile ,  self.logFile )
+        self.tcpSettings: TcpSettings = ConfFileTCP(confFile,  self.logFile )
         
-        self.udpSettings : UdpSettings = ConfFileUDP(confFile)
-        self.ntripClient : NtripClient = ConfFileNTRIPClient(confFile)
+        self.udpSettings : UdpSettings = ConfFileUDP(confFile ,  self.logFile )
+        self.ntripClient : NtripClient = ConfFileNTRIPClient(confFile ,  self.logFile )
         try :
             self.StreamType : StreamType = StreamType(int(confFile.get("connectionType")))
         except :
@@ -1040,6 +1196,8 @@ class PortConfig:
         """
         Disconnects the port if is connected in case of a exception caused in the task Thread
         """
+        if self.logFile is not None : 
+            self.logFile.info("Stream %s : Disconnecting stream due to error in task")
         self.StopEvent.set()
         self.currentTask = None
         try :
@@ -1058,7 +1216,7 @@ class PortConfig:
         while not queue.empty():
             queue.get() 
     
-def ConfFileSerial(confFile :configparser.SectionProxy):
+def ConfFileSerial(confFile :configparser.SectionProxy, logFile : logging.Logger):
     """
     Init Serial settings of the current stream with value from a configuration file.
     If no value in configuration file , default value will be use
@@ -1090,9 +1248,9 @@ def ConfFileSerial(confFile :configparser.SectionProxy):
         rtscts : bool = True if confFile.get('Serial.RtcCts').lower() == "true" else False
     except :
         rtscts = False
-    return SerialSettings(Port= port , baudrate=baudrate , parity=parity , stopbits=stopbits,bytesize=bytesize , Rtscts=rtscts)
+    return SerialSettings(Port= port , baudrate=baudrate , parity=parity , stopbits=stopbits,bytesize=bytesize , Rtscts=rtscts, logFile=logFile)
 
-def ConfFileTCP(confFile : configparser.SectionProxy):
+def ConfFileTCP(confFile : configparser.SectionProxy, logFile : logging.Logger):
     """
     Init TCP settings of the current stream with value from a configuration file.
     If no value in configuration file , default value will be use
@@ -1115,9 +1273,9 @@ def ConfFileTCP(confFile : configparser.SectionProxy):
     else:
         streamMode : StreamMode = StreamMode.CLIENT
             
-    return TcpSettings(host= host , port= port ,streamMode=streamMode)
+    return TcpSettings(host= host , port= port ,streamMode=streamMode,logFile=logFile)
    
-def ConfFileUDP(confFile : configparser.SectionProxy):
+def ConfFileUDP(confFile : configparser.SectionProxy, logFile : logging.Logger):
     """
     Init UDP settings of the current stream with value from a configuration file.
     If no value in configuration file , default value will be use
@@ -1142,9 +1300,9 @@ def ConfFileUDP(confFile : configparser.SectionProxy):
     except : 
         specificHost = False
     
-    return UdpSettings(host=host,port=port , dataflow=dataFlow,specificHost=specificHost)
+    return UdpSettings(host=host,port=port , dataflow=dataFlow,specificHost=specificHost , logFile= logFile)
     
-def ConfFileNTRIPClient(confFile : configparser.SectionProxy ):
+def ConfFileNTRIPClient(confFile : configparser.SectionProxy , logFile : logging.Logger):
     """
     Init a Ntrip client with value from a configuration file.
     If no value in configuration file , default value will be use
@@ -1194,4 +1352,4 @@ def ConfFileNTRIPClient(confFile : configparser.SectionProxy ):
     
         
     return NtripClient(host=host , port=port , auth=auth , username=username , password= password , mountpoint=mountpoint 
-                        , tls= tls ,fixedPos=fixedPos , latitude = latitude , longitude = longitude , height = height)
+                        , tls= tls ,fixedPos=fixedPos , latitude = latitude , longitude = longitude , height = height , logFile= logFile )

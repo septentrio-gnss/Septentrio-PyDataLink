@@ -35,7 +35,7 @@ import serial
 from .Preferences import Preferences
 from .PortConfig import PortConfig
 from src import constants
-
+import logging
 """
     Class which initialise every Port/Stream.
     Depending on the input it can be configure via a configuration file or via a configuration list
@@ -51,6 +51,8 @@ class Streams :
         self.streamSettingsList = streamSettingsList
         self.StreamList : list[PortConfig] = []
         self.linkedData : list[queue.Queue] = []
+        self.logFile : logging.Logger = logging.getLogger("PyDatalink")
+        logging.basicConfig(filename= constants.DEFAULTLOGFILE, encoding='utf-8', level=logging.DEBUG, format='[%(asctime)s] %(levelname)s : %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
             #Init Communication Queues
         for i in range (self.maxStream) : 
             self.linkedData.append(queue.Queue())
@@ -61,7 +63,7 @@ class Streams :
             if configFile is None :
                 for i in range(maxStream):
                     if configFile is None :
-                        newPort = PortConfig(i ,self.linkedData )
+                        newPort = PortConfig(i ,self.linkedData , logFile=self.logFile )
                         self.StreamList.append(newPort)
                 self.preferences = Preferences(maxStream)
                 
@@ -82,12 +84,12 @@ class Streams :
                             
                         if "Port" in key and nbPreConfig < self.maxStream :
                             portKey = config[key]
-                            newPort = PortConfig(nbPreConfig ,self.linkedData,portKey)
+                            newPort = PortConfig(nbPreConfig ,self.linkedData,portKey, logFile=self.logFile)
                             self.StreamList.append(newPort)
                             nbPreConfig += 1
                     if nbPreConfig < self.maxStream :
                         for i in range(self.maxStream - nbPreConfig):
-                            newPort = PortConfig(i + nbPreConfig ,self.linkedData )
+                            newPort = PortConfig(i + nbPreConfig ,self.linkedData , logFile=self.logFile )
                             self.StreamList.append(newPort)
                     for portId in range(len(self.preferences.Connect)):
                         self.StreamList[portId].setLineTermination(self.preferences.lineTermination)
@@ -105,7 +107,7 @@ class Streams :
                 StreamType = stream.split("://")[0]
                 if StreamType.lower() in ["udp","udpspe","tcpcli","tcpsrv","serial","ntrip"]:
                     try : 
-                        newPort = PortConfig(iterator,self.linkedData,commandLineConfig=stream)
+                        newPort = PortConfig(iterator,self.linkedData,commandLineConfig=stream , logFile= self.logFile)
                         self.StreamList.append(newPort)
                         iterator += 1
                     except Exception as e : 

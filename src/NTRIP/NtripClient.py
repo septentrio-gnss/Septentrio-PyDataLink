@@ -32,6 +32,7 @@ import datetime
 import math
 from .NtripSourceTable import NtripSourceTable
 from .NtripSettings import NtripSettings , ConnectFailedError
+import logging
 
 RAD2DEGREES = 180.0 / 3.141592653589793
 
@@ -48,17 +49,20 @@ class ClosingError(Exception):
 class NtripClient:
     
     def __init__(self, host : str = "" , port : int = 2101 , auth : bool = False, username : str = "" , password : str = "" , mountpoint :str = "",tls :bool =False ,
-                 fixedPos : bool = False , latitude : str = "00.000000000" , longitude : str = "000.000000000" , height : int = 0) -> None:
+                 fixedPos : bool = False , latitude : str = "00.000000000" , longitude : str = "000.000000000" , height : int = 0 , logFile : logging = None) -> None:
                   
-        self.ntripSettings : NtripSettings = NtripSettings(host,port,auth,username,password,mountpoint,tls,fixedPos,latitude,longitude,height)
+        self.ntripSettings : NtripSettings = NtripSettings(host,port,auth,username,password,mountpoint,tls,fixedPos,latitude,longitude,height,logFile)
         self.socket = None
         self.connected : bool = False
         self.fixedPosGga : str = None
+        self.logFile : logging = logFile
         
 
     def connect(self):
+        self.logFile.debug("Create NTRIP Client socket")
         self.socket = self.ntripSettings.connect()
         self.connected = True
+        self.logFile.info("NTRIP Client socket Created")
         try:
             self._connectRequest()
         except Exception as e:
@@ -66,6 +70,8 @@ class NtripClient:
             raise e
 
     def sendNMEA(self, nmeaMessage):
+        if self.logFile is not None : 
+            self.logFile.debug("Sending NMEA Message : %s", nmeaMessage)
         if self.ntripSettings.ntripVersion == 2 : 
             request = "GET /"+ self.ntripSettings.mountpoint +" HTTP/1.1\r\n"
         else : 
@@ -87,11 +93,14 @@ class NtripClient:
         self._sendRequest(request)
     
     def getSourceTable(self):
+        if self.logFile is not None :
+            self.logFile.debug("Getting source table from NTRIP Caster %s" ,self.ntripSettings.host )
         tempConnection = None
         if not self.connected:
             try :
                 self.socket = self.ntripSettings.connect()
             except Exception as e: 
+                self.logFile.error("Failed to connect to NTRIP caster %s : %s" , self.ntripSettings.host,e)
                 raise SourceTableRequestError(e)
             tempConnection = True
             
@@ -106,12 +115,18 @@ class NtripClient:
         try :
             self._sendRequest(request)
         except SendRequestError as e :
+            if self.logFile is not None :
+                self.logFile.error("Failed to send Header : %s" ,e)
             raise SourceTableRequestError("Failed to send header")
         try :
             response : str = self._receiveResponse()
         except ReceiveRequestError as e :
+            if self.logFile is not None :
+                self.logFile.error("Failed to read source table : %s" ,e)
             raise SourceTableRequestError("Failed to read source table")
         if "200" in response :
+            if self.logFile is not None :
+                self.logFile.info("parsing source table ")
             # Parse the response to extract the resource table
             response : str= response.split("\r\n\r\n")[1]
             sources = response.split("STR;")
@@ -123,27 +138,52 @@ class NtripClient:
                 source_table.append(NtripSourceTable(newsourcetable[0],newsourcetable[1],newsourcetable[2],newsourcetable[3]))
             if tempConnection is not None:
                 self.close()
+            if self.logFile is not None :
+                self.logFile.debug("Number of mountpoints available from %s : %s " , self.ntripSettings.host , str(len(source_table)))
             return source_table
+        else :
+            if self.logFile is not None : 
+                        self.logFile.error("The return value is inccorect")
+                        self.logFile.debug("NTRIP Caster response : %s",response)
+            raise SourceTableRequestError("Error in returned source table")
+        
     
     def _connectRequest(self):
         
-        request = f"GET /{self.ntripSettings.mountpoint} HTTP/1.1\r\n"
+        if self.ntripSettings.ntripVersion == 2 : 
+            request = "GET /"+ self.ntripSettings.mountpoint +" HTTP/1.1\r\n"
+        else : 
+            request = "GET /"+ self.ntripSettings.mountpoint +" HTTP/1.0\r\n"
         request += f"Host: {self.ntripSettings.host}\r\n"
         request += "User-Agent: NTRIP pydatalink Client\r\n"
-        request += "Ntrip-Version: Ntrip/2.0\r\n"
-        request += "Authorization: Basic " +  base64.b64encode((self.ntripSettings.username + ":" + self.ntripSettings.password).encode()).decode() + "\r\n"
-        request += "Connection: close\r\n\r\n"
+        if self.ntripSettings.ntripVersion == 2 : 
+            request += "Ntrip-Version: Ntrip/2.0\r\n"
+        else : 
+            request += "Ntrip-Version: Ntrip/1.0\r\n"
+        if self.ntripSettings.auth : 
+            request += "Authorization: Basic " +  base64.b64encode((self.ntripSettings.username + ":" + self.ntripSettings.password).encode()).decode() + "\r\n"
+        if self.ntripSettings.ntripVersion ==2 : 
+            request += "Connection: close\r\n\r\n"
         
         try :
             self._sendRequest(request)
         except SendRequestError as e : 
-            raise ConnectRequestError(e)
+            if self.logFile is not None : 
+                self.logFile.error("Failed to send request : %s",e)
+            raise SendRequestError(e)
         try :
             response = self._receiveResponse()
+            self.logFile.debug("return value from the request :  %s", response)
+            
         except ReceiveRequestError as e: 
-            raise ConnectRequestError(e)
-        if "401" in response : 
+            if self.logFile is not None : 
+                self.logFile.debug("return value from the request :  %s", response)
+                self.logFile.error("Failed to catch response : %s",e)
+            raise ReceiveRequestError(e)
+        if "HTTP/1.1 40" in response or "HTTP/1.0 40" in response : 
             error = response.split("\r\n\r\n")[1]
+            if self.logFile is not None : 
+                self.logFile.error("Client error : %s",error.replace("\n","").replace("\r",""))
             raise ConnectRequestError(error)
         
         
@@ -187,6 +227,9 @@ class NtripClient:
 
         result += "{:02X}\r\n".format(checkSum)
         self.fixedPosGga = result
+        
+        if self.logFile is not None : 
+                self.logFile.debug("New GGA String : %s " , result.replace("\n","").replace("\r",""))
         return result
 
     def close(self):
@@ -198,7 +241,11 @@ class NtripClient:
 
     def set_Settings_Host(self, host):
         self.ntripSettings.setHost(host)
+        if self.logFile is not None: 
+            self.logFile.info("New NTRIP Host Name : %s" , host)
         try : 
             self.ntripSettings.sourceTable = self.getSourceTable()
         except Exception as e :
+            if self.logFile is not None: 
+                self.logFile.error("Failed to get Source Table : %s" , e )
             raise e

@@ -29,7 +29,7 @@
 
 import configparser
 from enum import Enum
-
+import logging
 from serial import Serial
 import serial.tools.list_ports
 
@@ -84,7 +84,7 @@ class SerialSettings:
 
     def __init__(self, Port: str = "", baudrate: BaudRate = BaudRate.eBAUD115200, parity: Parity = Parity.PARITY_NONE,
                  stopbits: StopBits = StopBits.STOPBITS_ONE, bytesize: ByteSize = ByteSize.EIGHTBITS,
-                 Rtscts: bool = False):
+                 Rtscts: bool = False , logFile : logging = None):
         """
         Initializes a new instance of the SerialSettings class.
         
@@ -95,10 +95,12 @@ class SerialSettings:
         self.stopbits : StopBits = stopbits
         self.bytesize : ByteSize = bytesize
         self.rtscts : bool= Rtscts
-                                                 
+                                             
+        # Support Logging file 
+        self.logFile : logging = logFile    
 
 
-    def GetAvailablePort()-> list :
+    def GetAvailablePort(self)-> list :
         """
         Gets the list of available ports.
 
@@ -109,6 +111,8 @@ class SerialSettings:
         availablePort = []
         for port, desc, hwid in sorted(ports):
             availablePort.append([port, desc])
+        if self.logFile is not None : 
+            self.logFile.debug("%s serial port detected" , str(len(availablePort)))
         return availablePort
 
     def Connect(self) -> Serial | None : 
@@ -126,8 +130,12 @@ class SerialSettings:
             return newSerial
         except Exception as e:
             if e.args[0] == 11 : 
-                raise Exception ("Port already in use")
+                if self.logFile is not None :
+                    self.logFile.error("Port %s is already in use" ,self.port )
+                raise Exception ("PortError","Port already in use")
             else:
+                self.logFile.error("Failed to open serial stream with port %s", self.port)
+                self.logFile.error("%s", e)
                 raise(e)
 
     def setPort(self, newport : str):

@@ -30,7 +30,7 @@
 import configparser
 from enum import Enum
 import socket
-
+import logging
 
 class DataFlow(Enum):
     """
@@ -54,7 +54,7 @@ class UdpSettings:
         specificHost (str): The specific host IP address to bind to.
     """
 
-    def __init__(self , host : str =  "localhost", port : int = 28784 , dataflow : DataFlow = DataFlow.Both , specificHost : bool = False) -> None:
+    def __init__(self , host : str =  "localhost", port : int = 28784 , dataflow : DataFlow = DataFlow.Both , specificHost : bool = False , logFile : logging =None) -> None:
         """
         Initializes a new instance of the UDPSettings class.
         
@@ -66,7 +66,7 @@ class UdpSettings:
         self.port : int = port
         self.DataFlow : DataFlow = dataflow
         self.specificHost : bool  = specificHost
-            
+        self.logFile : logging = logFile
 
 
 
@@ -84,13 +84,17 @@ class UdpSettings:
             newsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             newsocket.settimeout(5)
         except socket.error as e :
+            if self.logFile is not None : 
+                self.logFile.error("Failed to create socket : %s" , e)
             raise e 
         try : 
             if self.specificHost is False:
                 newsocket.bind(('', self.port))
             return newsocket
         except socket.error as e :
-                    raise e
+            if self.logFile is not None : 
+                self.logFile.error("Failed to create UDP server : %s" ,e)
+            raise e
 
 
     def setHost(self, NewHost : str):

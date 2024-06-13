@@ -1,9 +1,10 @@
 import threading
 from ..StreamConfig import *
+from ..constants import *
 import copy
 import PySide6.QtAsyncio as QtAsyncio
 from PySide6.QtCore import QSize, Qt , QRegularExpression
-from PySide6.QtGui import QIntValidator , QRegularExpressionValidator,QTextCursor,QAction
+from PySide6.QtGui import QIntValidator , QRegularExpressionValidator,QTextCursor,QAction,QIcon
 from PySide6.QtWidgets import (QMainWindow, QApplication, QCheckBox, QComboBox,
                                QCommandLinkButton, QDateTimeEdit, QDial,
                                QDialog, QDialogButtonBox, QFileSystemModel,
@@ -37,9 +38,10 @@ class GraphicalUserInterface(QMainWindow):
     def __init__(self, streams : Streams) -> None:
         super().__init__()
         self.setFixedSize(950,750)
+        self.setWindowIcon(QIcon(DATAFILESPATH + 'pyDatalink_icon.png'))
         self.streams : Streams = streams
         self.streamsWidget : list[ConnectionCard] = []
-        self.setWindowTitle("PyDataLink")
+        self.setWindowTitle(APPNAME)
         
         # Menu bar 
         menuBar = self.menuBar()
@@ -208,8 +210,8 @@ class ConnectionCard :
                 self.status.setText("Connected")
                 self.connectButton.setText("Disconnect")
             except Exception as e : 
-                self.status.setText(f"Couldn't connect : \n {e}")
-                self.status.setToolTip(str(e))
+                self.status.setText("Couldn't connect")
+                self.status.setToolTip(str(e.args[1]))
         else :
             try : 
                 self.stream.Disconnect()
@@ -217,8 +219,8 @@ class ConnectionCard :
                 self.status.setText("")
                 self.connectButton.setText("Connect")
             except Exception as e : 
-                self.status.setText(f"Couldn't Disconnect : \n {e}")
-                self.status.setToolTip(str(e))
+                self.status.setText(f"Couldn't Disconnect")
+                self.status.setToolTip(str(e.args[1]))
                 
     def showData(self):
         if self.stream.ShowInputData.is_set() or self.stream.ShowOutputData.is_set():
@@ -239,6 +241,7 @@ class ConfigureInterface(QDialog) :
     def __init__(self , stream : PortConfig  = None) -> None:
         super().__init__()
         self.setWindowTitle(f"Configure Connection {stream.id}")
+        self.setWindowIcon(QIcon(DATAFILESPATH + 'pyDatalink_icon.png'))
         self.stream = stream
         self.streamsave = copy.copy(stream)
         self.setModal(True)
@@ -257,7 +260,7 @@ class ConfigureInterface(QDialog) :
         configTabs.addTab(udpMenu, "UDP")
         configTabs.addTab(ntripMenu, "NTRIP")
         
-        if len(SerialSettings.GetAvailablePort()) == 0 : 
+        if len(self.stream.serialSettings.GetAvailablePort()) == 0 : 
             configTabs.setTabEnabled(index,False)
 
         configureLayout.addWidget(configTabs)
@@ -330,7 +333,7 @@ class ConfigureInterface(QDialog) :
         
         #Available Port
         availablePortList = QComboBox()
-        ports = SerialSettings.GetAvailablePort() 
+        ports = self.stream.serialSettings.GetAvailablePort() 
         if len(ports) > 0 : 
             for port in ports : 
                 availablePortList.addItem(port[0].replace("/dev/ttyACM","COM") + " - " + port[1].split("-")[0],port[0])
@@ -752,6 +755,7 @@ class ShowDataInterface(QDialog):
         self.stream = stream
         self.setMinimumSize(350,300)
         self.setBaseSize(350,300)
+        self.setWindowIcon(QIcon(DATAFILESPATH + 'pyDatalink_icon.png'))
         self.setWindowTitle("Data Link Connection " + str(stream.id))
         configureLayout = QVBoxLayout(self)
         self.showDataOutput = QTextEdit()

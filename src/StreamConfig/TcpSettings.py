@@ -30,6 +30,7 @@
 import configparser
 from enum import Enum
 import socket
+import logging
 
 
 class StreamMode(Enum):
@@ -43,12 +44,13 @@ class TcpSettings:
     
     """
 
-    def __init__(self , host : str = "localhost" , port : int =28784 , streamMode : StreamMode = StreamMode.CLIENT) -> None:
+    def __init__(self , host : str = "localhost" , port : int =28784 , streamMode : StreamMode = StreamMode.CLIENT , logFile : logging = None) -> None:
             self.host : str = host
             self.port : int = port
             self.StreamMode : StreamMode = streamMode
             if self.StreamMode == StreamMode.SERVER : 
                 self.host = ''
+            self.logFile : logging = logFile
        
 
 
@@ -66,6 +68,8 @@ class TcpSettings:
             newsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             newsocket.settimeout(5)
         except socket.error as e :
+            if self.logFile is not None :
+                self.logFile.error("Failed to start socket : %s" , e)
             raise e 
         match self.StreamMode : 
             case StreamMode.CLIENT :
@@ -73,6 +77,8 @@ class TcpSettings:
                     newsocket.connect((self.host, self.port))
                     return newsocket
                 except socket.error as e :
+                    if self.logFile is not None : 
+                        self.logFile.error("Failed to open the Client socket ( host : %s and port : %s) : %s",self.host , self.port , e)
                     raise e
             case StreamMode.SERVER :
                 try : 
@@ -80,6 +86,8 @@ class TcpSettings:
                     newsocket.bind(('', self.port))
                     return newsocket
                 except socket.error as e :
+                    if self.logFile is not None : 
+                        self.logFile.error("Failed to open the Server socket : %s" , e)
                     raise e
 
 
