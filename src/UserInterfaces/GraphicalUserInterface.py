@@ -3,7 +3,7 @@ from ..StreamConfig import *
 from ..constants import *
 import copy
 import PySide6.QtAsyncio as QtAsyncio
-from PySide6.QtCore import QSize, Qt , QRegularExpression
+from PySide6.QtCore import QSize, Qt , QRegularExpression , QThread , Signal
 from PySide6.QtGui import QIntValidator , QRegularExpressionValidator,QTextCursor,QAction,QIcon
 from PySide6.QtWidgets import (QMainWindow, QApplication, QCheckBox, QComboBox,
                                QCommandLinkButton, QDateTimeEdit, QDial,
@@ -31,6 +31,9 @@ def TrioWidgets(widget1,widget2,widget3) -> QHBoxLayout:
     result.addWidget(widget3)
     result.setAlignment(Qt.AlignmentFlag.AlignTop)
     return result
+
+
+
 
 
 class GraphicalUserInterface(QMainWindow):
@@ -211,7 +214,10 @@ class ConnectionCard :
                 self.connectButton.setText("Disconnect")
             except Exception as e : 
                 self.status.setText("Couldn't connect")
-                self.status.setToolTip(str(e.args[1]))
+                if len(e.args) > 2 :
+                    self.status.setToolTip(str(e.args[1]))
+                else:
+                    self.status.setToolTip(str(e.args[0]))
         else :
             try : 
                 self.stream.Disconnect()
@@ -307,9 +313,11 @@ class ConfigureInterface(QDialog) :
         logBoxLayout = QVBoxLayout(logBox)
         
         logCheckBox = QCheckBox()
+        closeScriptCheckBox.setChecked(self.stream.logging)
         logLabel = QLabel("Log File : ")
         logEdit = QLineEdit()
-        logEdit.setDisabled(True)
+        logEdit.setDisabled(not self.stream.logging)
+        logEdit.setText(self.stream.loggingFile)
         logBoxLayout.addLayout(TrioWidgets(logCheckBox,logLabel,logEdit))
         
         # Final Layout 
@@ -324,6 +332,7 @@ class ConfigureInterface(QDialog) :
         streamTypeList.currentIndexChanged.connect(lambda : self.stream.setStreamType(streamTypeList.currentData()))
         openScriptCheckBox.checkStateChanged.connect(lambda : self.openScriptFile(openScriptEdit,openScriptCheckBox , True))
         closeScriptCheckBox.checkStateChanged.connect(lambda : self.openScriptFile(closeScriptEdit,closeScriptCheckBox , False))
+        logCheckBox.checkStateChanged.connect(lambda :self)
         
         return result
     
@@ -672,12 +681,14 @@ class ConfigureInterface(QDialog) :
     def updateMountpointList(self):
             self.mountPointList.clear()
             self.mountPointList.setPlaceholderText("Waiting for source table ...")
-            threading.Thread(target=self.taskGetNewSourceTable).start()
+            self.updatethread = ConfigurationThread(self)
+            self.updatethread.finished.connect(self.taskGetNewSourceTable)
+            self.updatethread.finished.connect(self.updatethread.deleteLater)
+            self.updatethread.start()
             
     def taskGetNewSourceTable(self):
         if len(self.ntriphostName.text()) > 0:
-                try:
-                    self.stream.ntripClient.set_Settings_Host(self.ntriphostName.text())
+            if self.stream.ntripClient.ntripSettings.sourceTable is not None:
                     if len(self.stream.ntripClient.ntripSettings.sourceTable) != 0:
                         for source in self.stream.ntripClient.ntripSettings.sourceTable:
                                 self.mountPointList.addItem(source.mountpoint, source.mountpoint)
@@ -686,11 +697,11 @@ class ConfigureInterface(QDialog) :
                                 else : 
                                     index : int = 3
                                 self.mountPointList.setPlaceholderText("")
-                                self.mountPointList.setCurrentIndex(index)           
-                except:
-                    self.mountPointList.setPlaceholderText("List unavailable")
+                                self.mountPointList.setCurrentIndex(index)
+            else :
+                self.mountPointList.setPlaceholderText("List unavailable")            
         else:
-                self.mountPointList.setPlaceholderText("List unavailable")
+            self.mountPointList.setPlaceholderText("List unavailable")
             
     def bottomButtonLayout(self):
                 
@@ -718,10 +729,6 @@ class ConfigureInterface(QDialog) :
         self.reject()
         
     def openScriptFile(self, inputWidget : QLineEdit, checkbox: QCheckBox, connectScript : bool = None ):
-        if connectScript :
-            self.stream.sendStartupScript = checkbox.isChecked()
-        else :
-            self.stream.sendCloseScript = checkbox.isChecked()
         if checkbox.isChecked(): 
             fileName = QFileDialog.getOpenFileName(self,"Select Script")
             if fileName[0] != '' and fileName[1] != '':
@@ -929,3 +936,18 @@ class PreferencesInterface(QDialog):
     def toggleStartupConnection(self, portid):
         self.preference.Connect[portid] = not self.preference.Connect[portid]
         
+           
+        
+class ConfigurationThread(QThread):
+    finished = Signal()
+
+    def __init__(self, configureInterface : ConfigureInterface):
+        super().__init__()
+        self.configuratInterface = configureInterface
+
+    def run(self):
+        try : 
+            self.configuratInterface.stream.ntripClient.set_Settings_Host(self.configuratInterface.ntriphostName.text())
+        except :
+             self.configuratInterface.stream.ntripClient.ntripSettings.sourceTable = None
+        self.finished.emit()
