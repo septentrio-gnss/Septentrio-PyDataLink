@@ -32,12 +32,16 @@ import threading
 import socket
 import sys
 import time
+
+from src.StreamSettings.SerialSettings import *
+from src.StreamSettings.TcpSettings import *
+from src.StreamSettings.UdpSettings import *
 try : 
     from simple_term_menu import TerminalMenu 
 except: 
     print("WARNING : You are running pyDataLink on a system that doesn't support TUI interface !")
-from ..StreamConfig import DataFlow , StreamMode , App , StreamType , Stream , BaudRate , Parity , StopBits , ByteSize , SerialSettings
-
+from ..StreamConfig import  App ,  Stream 
+from ..StreamSettings import *
 
 
 
@@ -116,7 +120,7 @@ class TerminalUserInterface :
 
         #StreamType
         iterator = 1 
-        for type in StreamType :
+        for type in Stream.StreamType :
             if type.value is not None:
                 self.configureStreamTypeMenuItems.append("[%d] - %s" %(iterator, str(type).replace("StreamType.","")))
                 iterator+=1
@@ -251,7 +255,7 @@ class TerminalUserInterface :
             if ConfigureMenuEntryIndex is None : return self.MainMenu()
             if ConfigureMenuEntryIndex < len(self.configureStreamTypeMenuItems) - 1 :
                 try : 
-                    selectedPort.Connect(StreamType(ConfigureMenuEntryIndex)) 
+                    selectedPort.Connect(Stream.StreamType(ConfigureMenuEntryIndex)) 
                 except Exception as e:
                     print(f"Connection failed ! : {e}")  
             return self.Connect_menu()

@@ -26,19 +26,23 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+import logging
 import os 
 import datetime
  
 APPNAME = "PyDataLink"
 PROJECTPATH = os.path.abspath(os.path.dirname(__file__)) #Path to the project folder
 MAINSCRIPTPATH = PROJECTPATH + "pyDatalink.py"
-DATAFILESPATH = PROJECTPATH + "/Data Files/"
-DATAPATH = os.path.expanduser("~") + "/.septentrio" # Path to the PyDataLink Data Folder
-CONFIGPATH = DATAPATH + "/confs"    # Path to the Configuration folder
-LOGFILESPATH = DATAPATH + "/logs"   # Path to the Logs folder
-DEFAULTCONFIGFILE = CONFIGPATH + "/pydatalink.conf"  # Path to the default configuration file
+DATAFILESPATH = PROJECTPATH + "\\Data Files\\"
+DATAPATH = os.path.expanduser("~") + "\\.septentrio" # Path to the PyDataLink Data Folder
+CONFIGPATH = DATAPATH + "\\confs"    # Path to the Configuration folder
+LOGFILESPATH = DATAPATH + "\\logs"   # Path to the Logs folder
+DEFAULTCONFIGFILE = CONFIGPATH + "\\pydatalink.conf"  # Path to the default configuration file
 
 now = datetime.datetime.now()
 filename = now.strftime("pyDatalink_%Y-%m-%d_%H-%M-%S.log")
 
-DEFAULTLOGFILE = LOGFILESPATH + "/" + filename # Path to the log file
+DEFAULTLOGFILEPATH = LOGFILESPATH + "\\" + filename # Path to the log file
+
+DEFAULTLOGFILELOGGER = logging.getLogger("PyDatalink")
+logging.basicConfig(filename= DEFAULTLOGFILEPATH, encoding='utf-8', level=logging.DEBUG, format='[%(asctime)s] %(levelname)s : %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')

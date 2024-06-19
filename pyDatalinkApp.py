@@ -28,20 +28,19 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import threading
 import sys
-from src.StreamConfig import *
-from src import constants
+from src.constants import  * 
+from src.StreamConfig.App import App , ConfigurationType
 try : 
     from PySide6.QtWidgets import QApplication
     from src.UserInterfaces import GraphicalUserInterface 
     GUI = True
-except :
+except Exception as e:
+    print(e)
     GUI = False
 import os
 import shutil
 import argparse
-import time
 try : 
     from src.UserInterfaces import TerminalUserInterface
     TUI = True
@@ -52,22 +51,18 @@ from src.UserInterfaces import CommandLineInterface
 
     
 def checkDataFolder():
-    if os.path.exists(constants.DATAPATH) is not True : 
-        os.mkdir(constants.DATAPATH)
-    if os.path.exists( constants.CONFIGPATH ) is not True:
-        os.mkdir(constants.CONFIGPATH )
-    if os.path.exists( constants.PROJECTPATH+ "/conf/pydatalink.conf")  and not os.path.exists(constants.DEFAULTCONFIGFILE): 
-        shutil.copy(constants.PROJECTPATH+ "/conf/pydatalink.conf" ,constants.DEFAULTCONFIGFILE )
-    if os.path.exists( constants.LOGFILESPATH ) is not True:
-        os.mkdir(constants.LOGFILESPATH )
-
-
+    if os.path.exists(DATAPATH) is not True : 
+        os.mkdir(DATAPATH)
+    if os.path.exists( CONFIGPATH ) is not True:
+        os.mkdir(CONFIGPATH )
+    if os.path.exists( LOGFILESPATH ) is not True:
+        os.mkdir(LOGFILESPATH )
 
 class DatalinkApp:
     
 
     def __init__(self) -> None:
-        self.Streams = None
+        self.app : App = None
         self.userInterface = None
         self.showDataPort = None
         if args.Mode == "CMD" :
@@ -82,24 +77,24 @@ class DatalinkApp:
                                 print(f"Error : streams id \"{args.ShowData}\" is not correct , please enter a valid ID !")
                                 return 
                     
-                    self.Streams = Streams(maxStream=len(args.Streams),streamSettingsList=args.Streams)
+                    self.app = App(maxStream=len(args.Streams),streamSettingsList=args.Streams , configurationType= ConfigurationType.CMDLINE)
                     if args.ShowData is not None :
-                        if show <= len(self.Streams.StreamList):
-                            self.showDataPort=self.Streams.StreamList[show - 1]
+                        if show <= len(self.app.StreamList):
+                            self.showDataPort=self.app.StreamList[show - 1]
                             self.showDataPort.ToggleAllDataVisibility()
                     
         else : 
                 if os.path.exists(args.ConfigPath): 
-                    self.Streams = Streams(configFile=args.ConfigPath)
-                elif os.path.exists(constants.DEFAULTCONFIGFILE) : 
-                    self.Streams = Streams(configFile=constants.DEFAULTCONFIGFILE)
+                    self.app = App(configurationType= ConfigurationType.FILE,configFile=args.ConfigPath, debugLogging=True)
+                elif os.path.exists(DEFAULTCONFIGFILE) : 
+                    self.app = App(configurationType= ConfigurationType.FILE , configFile=DEFAULTCONFIGFILE , debugLogging=True)
                 else :
-                    self.Streams = Streams()
+                    self.app = App(debugLogging=True)
         self.Start()
                 
     def Start(self) -> None : 
         if args.Mode == "TUI":
-             self.DatalinkInTerminalStart()
+            self.DatalinkInTerminalStart()
         elif args.Mode == "GUI":
             self.DatalinkInGuiStart()
         elif args.Mode == "CMD":
@@ -108,7 +103,7 @@ class DatalinkApp:
 
     def DatalinkInTerminalStart(self):
         if os.name == "posix" and TUI:
-                self.userInterface = TerminalUserInterface(self.Streams)
+                self.userInterface = TerminalUserInterface(self.app)
                 sys.exit(self.userInterface.MainMenu())
             
         elif not TUI:
@@ -119,14 +114,14 @@ class DatalinkApp:
     def DatalinkInGuiStart(self):
         if(GUI):
             self.userInterface = QApplication()
-            gallery = GraphicalUserInterface.GraphicalUserInterface(self.Streams)
+            gallery = GraphicalUserInterface.GraphicalUserInterface(self.app)
             gallery.show()
             sys.exit(self.userInterface.exec())
         else :
             print(f"PySide6 is required to run in GUI mode \nInstall pyside : pip install PySide6 \nOr run the App in a Different mode (-m CMD or -m TUI)")
         
     def DatalinkInCmdStart(self):
-        self.userInterface = CommandLineInterface.CommandLineInterface(self.Streams , showdataId = self.showDataPort)
+        self.userInterface = CommandLineInterface.CommandLineInterface(self.app , showdataId = self.showDataPort)
         sys.exit(self.userInterface.run())
     
         
@@ -139,7 +134,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="PyDatalink" ,description='')
     parser.add_argument('--Mode','-m', choices=['TUI', 'GUI', 'CMD'], default='GUI',
                         help="Start %(prog)s with a specific interface (DEFAULT : GUI)")
-    parser.add_argument('--ConfigPath','-c', action='store', default= constants.DEFAULTCONFIGFILE ,
+    parser.add_argument('--ConfigPath','-c', action='store', default= DEFAULTCONFIGFILE ,
                             help='Path to the config file ( This Option won\'t be use when in CMD mode )  ')
 
     parser.add_argument('--Streams' ,'-s', nargs='*' , action='store' , 
@@ -149,7 +144,7 @@ if __name__ == "__main__":
     
 
     args = parser.parse_args()
-    App = DatalinkApp()
+    DatalinkApp()
         
 
 
