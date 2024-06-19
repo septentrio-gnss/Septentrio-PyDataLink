@@ -27,11 +27,12 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import configparser
 from enum import Enum
 import logging
 from serial import Serial
 import serial.tools.list_ports
+
+from src.constants import DEFAULTLOGFILELOGGER
 
 class BaudRate(Enum):
     eBAUD300 =  "300"
@@ -84,7 +85,7 @@ class SerialSettings:
 
     def __init__(self, Port: str = "", baudrate: BaudRate = BaudRate.eBAUD115200, parity: Parity = Parity.PARITY_NONE,
                  stopbits: StopBits = StopBits.STOPBITS_ONE, bytesize: ByteSize = ByteSize.EIGHTBITS,
-                 Rtscts: bool = False , logFile : logging = None):
+                 Rtscts: bool = False , debugLogging : bool = False):
         """
         Initializes a new instance of the SerialSettings class.
         
@@ -97,7 +98,10 @@ class SerialSettings:
         self.rtscts : bool= Rtscts
                                              
         # Support Logging file 
-        self.logFile : logging = logFile    
+        if debugLogging : 
+            self.logFile : logging.Logger = DEFAULTLOGFILELOGGER
+        else :
+            self.logFile = None  # type: ignore
 
 
     def GetAvailablePort(self)-> list :
@@ -123,19 +127,25 @@ class SerialSettings:
             Serial: The serial port object.
         """
         try:
-            newSerial = Serial(None, baudrate=self.baudrate.value, bytesize=self.bytesize.value,
+            newSerial = Serial(None, baudrate=int(self.baudrate.value), bytesize=self.bytesize.value,
                           parity=self.parity.value, stopbits=self.stopbits.value, rtscts=self.rtscts, timeout=0.01,exclusive=True)
             newSerial.port = self.port
             newSerial.open()
             return newSerial
         except Exception as e:
-            if e.args[0] == 11 : 
+            print(e)
+            if e.args[0] == 11 or "PermissionError" in e.args[0] : 
                 if self.logFile is not None :
                     self.logFile.error("Port %s is already in use" ,self.port )
                 raise Exception ("PortError","Port already in use")
+            elif "FileNotFoundError" in e.args[0]:
+                if self.logFile is not None :
+                    self.logFile.error("Port %s not found " ,self.port )
+                raise Exception ("PortError","Port unreachable or not available")
             else:
-                self.logFile.error("Failed to open serial stream with port %s", self.port)
-                self.logFile.error("%s", e)
+                if self.logFile is not None : 
+                    self.logFile.error("Failed to open serial stream with port %s", self.port)
+                    self.logFile.error("%s", e)
                 raise(e)
 
     def setPort(self, newport : str):
@@ -202,17 +212,4 @@ class SerialSettings:
         parity = self.parity.name.replace("PARITY_","")
         return f"Port : {self.port} \n BaudRate :{self.baudrate.value} \n Parity : {parity} \n StopBits : {self.stopbits.value} \n ByteSize : {self.bytesize.value} \n rtscts : {self.rtscts}"
     
-    def SaveConfig(self , sectionName : str,SaveConfigFile  : configparser.ConfigParser):
-        """
-            Add current class values in the configFile
-        Args:
-            sectionName (str): name of the current section
-            SaveConfigFile (configparser.ConfigParser): configparser of the configuration file
-        """
-        
-        SaveConfigFile.set(sectionName,"Serial.Port", str(self.port))
-        SaveConfigFile.set(sectionName,"Serial.BaudRate",str(self.baudrate.value))
-        SaveConfigFile.set(sectionName,"Serial.Parity",str(self.parity.value))
-        SaveConfigFile.set(sectionName,"Serial.StopBits",str(self.stopbits.value))
-        SaveConfigFile.set(sectionName,"Serial.ByteSize",str(self.bytesize.value))
-        SaveConfigFile.set(sectionName,"Serial.RtcCts",str(self.rtscts))
+    

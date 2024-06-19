@@ -27,11 +27,11 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import configparser
+
 from enum import Enum
 import socket
 import logging
-
+from ..constants import DEFAULTLOGFILELOGGER
 
 class StreamMode(Enum):
     CLIENT = "Client"
@@ -44,13 +44,17 @@ class TcpSettings:
     
     """
 
-    def __init__(self , host : str = "localhost" , port : int =28784 , streamMode : StreamMode = StreamMode.CLIENT , logFile : logging = None) -> None:
+    def __init__(self , host : str = "localhost" , port : int =28784 , streamMode : StreamMode = StreamMode.CLIENT ,  debugLogging : bool =False) -> None:
             self.host : str = host
             self.port : int = port
             self.StreamMode : StreamMode = streamMode
             if self.StreamMode == StreamMode.SERVER : 
                 self.host = ''
-            self.logFile : logging = logFile
+            
+            if debugLogging : 
+                self.logFile : logging.Logger = DEFAULTLOGFILELOGGER
+            else : 
+                self.logFile = None # type: ignore
        
 
 
@@ -135,13 +139,4 @@ class TcpSettings:
         return f" Host : {self.host} \n Port :{self.port} \n StreamMode : {self.StreamMode.value}"
     
     
-    def SaveConfig(self , sectionName : str,SaveConfigFile  : configparser.ConfigParser):
-        """
-            Add current class values in the configFile
-        Args:
-            sectionName (str): name of the current section
-            SaveConfigFile (configparser.ConfigParser): configparser of the configuration file
-        """
-        SaveConfigFile.set(sectionName,"hostName",self.host)
-        SaveConfigFile.set(sectionName,"portNumber",str(self.port))
-        SaveConfigFile.set(sectionName,"TCPserver",str(self.isServer()))
+    

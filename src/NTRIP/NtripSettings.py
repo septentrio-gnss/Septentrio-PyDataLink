@@ -27,12 +27,11 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import base64
-import configparser
 import socket
 from .NtripSourceTable import NtripSourceTable
 import ssl
 import logging
+from ..constants import DEFAULTLOGFILELOGGER
 
 
 class InvalidHostnameError(Exception):
@@ -57,7 +56,7 @@ class NtripSettings:
     """
 
     def __init__(self , host : str = "" , port : int = 2101 ,auth : bool = False, username : str = "" , password : str = "",
-                 mountpoint : str = "" , tls : bool = False , fixedPos : bool = False , latitude : str = "00.000000000" , longitude : str = "000.000000000" , height : int = 0 , logFile : logging  = None) -> None:
+                 mountpoint : str = "" , tls : bool = False , fixedPos : bool = False , latitude : float = 00.00 , longitude : float = 0.000 , height : int = 0 , debugLogging : bool  = False) -> None:
         """
         Initializes a new instance of the NTRIPSettings class.
         """
@@ -76,14 +75,17 @@ class NtripSettings:
 
         # Fixed Position GGA
         self.fixedPos : bool = fixedPos
-        self.latitude : float = float(latitude)
-        self.longitude : float = float(longitude)
+        self.latitude : float = latitude
+        self.longitude : float = longitude
         self.height : int = height
             
-        self.sourceTable : list[NtripSourceTable] = None
+        self.sourceTable : list[NtripSourceTable] = []
         
         # Support Log
-        self.logFile : logging = logFile
+        if debugLogging : 
+            self.logFile : logging.Logger = DEFAULTLOGFILELOGGER
+        else :
+            self.logFile = None
             
     def connect(self):    
             if len(self.host) == 0:
@@ -118,7 +120,7 @@ class NtripSettings:
                 except Exception as e:
                     if self.logFile is not None :
                         self.logFile.error("Failed to open socket : %s", e )
-                    raise ConnectFailedError(e)
+                    raise ConnectFailedError()
 
 
     def setHost(self, NewHost : str):
@@ -251,15 +253,4 @@ class NtripSettings:
     def toString(self) ->str :
         return f"Host : {self.host} \n Port : {self.port} \n Username : {self.username} \n Password : {self.password} \n Mountpoint : {self.mountpoint} \n"
     
-    def SaveConfig(self , sectionName : str,SaveConfigFile  : configparser.ConfigParser):
-        SaveConfigFile.set(sectionName,"NTRIP.hostname",str(self.host))
-        SaveConfigFile.set(sectionName,"NTRIP.portnumber",str(self.port))
-        SaveConfigFile.set(sectionName,"NTRIP.mountPoint",str(self.mountpoint))
-        SaveConfigFile.set(sectionName,"NTRIP.authenticationenabled", str(self.auth))
-        SaveConfigFile.set(sectionName,"NTRIP.user",str(self.username))
-        SaveConfigFile.set(sectionName,"NTRIP.password",str(base64.b64encode((self.password).encode()).decode()))
-        SaveConfigFile.set(sectionName,"NTRIP.fixedpositionset",str(self.fixedPos))
-        SaveConfigFile.set(sectionName,"NTRIP.fixedLatitude",str(self.latitude))
-        SaveConfigFile.set(sectionName,"NTRIP.fixedLongitude",str(self.longitude))
-        SaveConfigFile.set(sectionName,"NTRIP.fixedHeight",str(self.height))
-        SaveConfigFile.set(sectionName,"NTRIP.TLS", str(self.tls))
+    

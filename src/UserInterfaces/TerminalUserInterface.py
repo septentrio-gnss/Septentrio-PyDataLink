@@ -36,7 +36,7 @@ try :
     from simple_term_menu import TerminalMenu 
 except: 
     print("WARNING : You are running pyDataLink on a system that doesn't support TUI interface !")
-from ..StreamConfig import DataFlow , StreamMode , Streams , StreamType , PortConfig , BaudRate , Parity , StopBits , ByteSize , SerialSettings
+from ..StreamConfig import DataFlow , StreamMode , App , StreamType , Stream , BaudRate , Parity , StopBits , ByteSize , SerialSettings
 
 
 
@@ -65,16 +65,16 @@ class TerminalUserInterface :
     UDPSettingsDataFlowItems = []
 
 
-    def __init__(self , Streams : Streams ) -> None:
-        self.Streams = Streams
-        for port , i in zip(Streams.StreamList , range(len(Streams.StreamList))):
+    def __init__(self ,app : App ) -> None:
+        self.App : App = app
+        for port , i in zip(app.StreamList , range(len(app.StreamList))):
            self.PortListMenuItems.insert(i,"[%d] - Stream %d - %s %s" %(i ,i ,( "Connected" if port.connected else "Disonnected") ,  ("" if port.StreamType is None else str(port.StreamType).replace("StreamType.","- "))))
         self._CreateMenus()
         
         self.showDataThread : threading.Thread = None
         self.stopShowDataEvent = threading.Event()
         
-    def _showDataTask(self, selectedPort : PortConfig):
+    def _showDataTask(self, selectedPort : Stream):
         while self.stopShowDataEvent.is_set() is False:
             if selectedPort.DataToShow.empty() is False :
                 print(selectedPort.DataToShow.get())
@@ -83,7 +83,7 @@ class TerminalUserInterface :
 
     def _refreshMenuItems(self) :
 
-        for port , i in zip(self.Streams.StreamList , range(len(self.Streams.StreamList))):
+        for port , i in zip(self.App.StreamList , range(len(self.App.StreamList))):
            self.PortListMenuItems[i] = "[%d] - Stream %d - %s %s" %(i ,i ,( "Connected" if port.connected else "Disonnected") , ("" if port.StreamType is None else str(port.StreamType).replace("StreamType.","- ")))
        
 
@@ -142,17 +142,17 @@ class TerminalUserInterface :
             case 3 : self.LinkPort_menu()
             case 4 : self.Preferences_menu()
             case _ : 
-                self.Streams.CloseAll()
+                self.App.CloseAll()
                 sys.exit()
       
     def ConfigureMenu(self):
         terminalMenu = TerminalMenu(self.PortListMenuItems ,clear_screen=False, title="Configuration Menu : \n Change Streams configs \n")
         ConfigureMenuEntryIndex = terminalMenu.show()
         if ConfigureMenuEntryIndex is None : return self.MainMenu()
-        if ConfigureMenuEntryIndex >= self.Streams.preferences.maxStreams :
+        if ConfigureMenuEntryIndex >= self.App.preferences.maxStreams :
              return self.MainMenu()
         else:
-            selectedPort : PortConfig = self.Streams.StreamList[ConfigureMenuEntryIndex]
+            selectedPort : Stream = self.App.StreamList[ConfigureMenuEntryIndex]
             if selectedPort.connected :
                 print("This port is currently connected , Disonnect before configuration ! \n")
                 return self.ConfigureMenu()
@@ -168,48 +168,48 @@ class TerminalUserInterface :
         
         preference_menu_Items : list = ["[q] - Back"]
 
-        preference_menu_Items.insert(0,"[1] - Configuration File Name - %s" %(self.Streams.preferences.configName))
-        preference_menu_Items.insert(1,"[2] - Line Termination - %s" %(str(self.Streams.preferences.getLineTermination())))
-        preference_menu_Items.insert(2,"[3] - Max streams- %s" %(self.Streams.preferences.maxStreams))
+        preference_menu_Items.insert(0,"[1] - Configuration File Name - %s" %(self.App.preferences.configName))
+        preference_menu_Items.insert(1,"[2] - Line Termination - %s" %(str(self.App.preferences.getLineTermination())))
+        preference_menu_Items.insert(2,"[3] - Max streams- %s" %(self.App.preferences.maxStreams))
         preference_menu_Items.insert(3,"[4] - Startup Connect")        
         
         def preferences_configurationFileName():
-            print(f"Current file name : {self.Streams.preferences.configName}")
+            print(f"Current file name : {self.App.preferences.configName}")
             print("Enter a new name for the file")
             newname = input()
-            self.Streams.preferences.configName= newname
+            self.App.preferences.configName= newname
             return self.Preferences_menu()
         
         def preferences_lineTermination():
-            print(f"Current line termination {self.Streams.preferences.getLineTermination()}")
+            print(f"Current line termination {self.App.preferences.getLineTermination()}")
             terminalMenu = TerminalMenu(["[1] - \\n" , "[2] - \\r" , "[3] - \\r\\n" , "[q] - Back"],clear_screen=False, title="Preferences Menu : Line Termination\n")
             lineTerminationMenuEntryIndex = terminalMenu.show()
             match lineTerminationMenuEntryIndex :
-                case 0 :  self.Streams.preferences.lineTermination = "\n"
-                case 1 :  self.Streams.preferences.lineTermination = "\r"
-                case 2 :  self.Streams.preferences.lineTermination = "\r\n"
+                case 0 :  self.App.preferences.lineTermination = "\n"
+                case 1 :  self.App.preferences.lineTermination = "\r"
+                case 2 :  self.App.preferences.lineTermination = "\r\n"
                 case _ : return self.Preferences_menu()
             return self.Preferences_menu()
         def preferences_maxStreams():
-            print(f"Current max number of stream : {self.Streams.preferences.maxStreams}")
+            print(f"Current max number of stream : {self.App.preferences.maxStreams}")
             maxStreamList = ["[1] - 1","[2] - 2","[3] - 3","[4] - 4","[5] - 5","[6] - 6","[q] - Back"]
             terminalMenu = TerminalMenu(maxStreamList,clear_screen=False, title="Preferences Menu : Max number of stream\n")
             maxStreamMenuEntryIndex = terminalMenu.show()
             if maxStreamMenuEntryIndex < len(maxStreamList) - 1:
-                self.Streams.preferences.maxStreams = maxStreamMenuEntryIndex + 1
+                self.App.preferences.maxStreams = maxStreamMenuEntryIndex + 1
             return self.Preferences_menu()
         
         def preferences_StartupConnect():
             iterator = 0
             PreferencesStartupconnectMenuItems = []
-            for startupConnect in self.Streams.preferences.Connect : 
+            for startupConnect in self.App.preferences.Connect : 
                 PreferencesStartupconnectMenuItems.append("[%d] - Stream %d - %s" %(iterator,iterator,("True" if startupConnect else "False")))
                 iterator +=1
             PreferencesStartupconnectMenuItems.append("[q] - Back") 
             terminalMenu = TerminalMenu(PreferencesStartupconnectMenuItems ,clear_screen=False, title="Preferences Menu : Startup Connect\n")
             startupConnectMenuEntryIndex = terminalMenu.show()
-            if startupConnectMenuEntryIndex <= len(self.Streams.preferences.Connect) - 1:
-                self.Streams.preferences.Connect[startupConnectMenuEntryIndex] = not self.Streams.preferences.Connect[startupConnectMenuEntryIndex]
+            if startupConnectMenuEntryIndex <= len(self.App.preferences.Connect) - 1:
+                self.App.preferences.Connect[startupConnectMenuEntryIndex] = not self.App.preferences.Connect[startupConnectMenuEntryIndex]
                 return preferences_StartupConnect()
             return self.Preferences_menu()
         
@@ -226,7 +226,7 @@ class TerminalUserInterface :
 
     def Connect_menu(self) :
 
-        def connect_menu_select_StreamType (selectedPort : PortConfig):
+        def connect_menu_select_StreamType (selectedPort : Stream):
             terminalMenu = TerminalMenu(self.connectDisconectItems ,clear_screen=False, title=" Connect Menu : Stream %i %s %s\n to change the stream type , the stream need to be disconnected\n" %(selectedPort.id,"Connected" if selectedPort.connected else "Disconnected",self.getSettingsTitle(selectedPort) if selectedPort.connected else "") )
             ConfigureMenuEntryIndex = terminalMenu.show()
             match ConfigureMenuEntryIndex :
@@ -239,12 +239,12 @@ class TerminalUserInterface :
                 case 1 : return Disconnect(selectedPort)
                 case _ : return self.Connect_menu()                
 
-        def Disconnect(selectedPort : PortConfig):
+        def Disconnect(selectedPort : Stream):
             if selectedPort.connected : 
                 selectedPort.Disconnect()
             return self.Connect_menu()
 
-        def Connect(selectedPort : PortConfig):
+        def Connect(selectedPort : Stream):
             terminalMenu = TerminalMenu(self.configureStreamTypeMenuItems ,clear_screen=False, title=" Connect Menu : Stream %i %s \n Choose wich type of stream you want\n" %(selectedPort.id,"Connected" if selectedPort.connected else "Disconnected" ))
             ConfigureMenuEntryIndex = terminalMenu.show()
             
@@ -260,8 +260,8 @@ class TerminalUserInterface :
         terminalMenu = TerminalMenu(self.PortListMenuItems , title="Connect Menu : \n Choose which stream you want to enable or disable\n" )
         ConfigureMenuEntryIndex =terminalMenu.show()
         if ConfigureMenuEntryIndex is None : return self.MainMenu()
-        if ConfigureMenuEntryIndex < self.Streams.preferences.maxStreams :
-            selectedPort : PortConfig = self.Streams.StreamList[ConfigureMenuEntryIndex]
+        if ConfigureMenuEntryIndex < self.App.preferences.maxStreams :
+            selectedPort : Stream = self.App.StreamList[ConfigureMenuEntryIndex]
             return connect_menu_select_StreamType(selectedPort)
         return self.MainMenu()
     
@@ -269,8 +269,8 @@ class TerminalUserInterface :
         terminalMenu = TerminalMenu(self.PortListMenuItems ,clear_screen=False, title="Show Data Menu : \n Select a stream \n" ,)
         showdataMenuEntryIndex = terminalMenu.show()
         if showdataMenuEntryIndex is None : return self.MainMenu()
-        if showdataMenuEntryIndex < self.Streams.preferences.maxStreams :
-            selectedPort : PortConfig = self.Streams.StreamList[showdataMenuEntryIndex]
+        if showdataMenuEntryIndex < self.App.preferences.maxStreams :
+            selectedPort : Stream = self.App.StreamList[showdataMenuEntryIndex]
             settings_title = self.getSettingsTitle(selectedPort)
             terminalMenu = TerminalMenu(self.showDataMenuItems ,title =f"Show Data Menu : Stream {selectedPort.id}" +settings_title  )
             showdataMenuEntryIndex = terminalMenu.show()
@@ -316,16 +316,16 @@ class TerminalUserInterface :
         terminalMenu = TerminalMenu(self.PortListMenuItems ,clear_screen=False, title="Link Menu : \n Link output data to a Stream\n" ,)
         LinkPortMenuEntryIndex = terminalMenu.show()
         if LinkPortMenuEntryIndex is None : return self.MainMenu()
-        if LinkPortMenuEntryIndex < self.Streams.preferences.maxStreams :
-            selectedPort = self.Streams.StreamList[LinkPortMenuEntryIndex]
+        if LinkPortMenuEntryIndex < self.App.preferences.maxStreams :
+            selectedPort = self.App.StreamList[LinkPortMenuEntryIndex]
             self.LinkPort_link_menu(selectedPort)
         return self.MainMenu()
     
-    def LinkPort_link_menu(self , selectedPort : PortConfig):
+    def LinkPort_link_menu(self , selectedPort : Stream):
 
-        def GetAvailableLinkList(selectedPort : PortConfig):
+        def GetAvailableLinkList(selectedPort : Stream):
             availableLink = []
-            for port in self.Streams.StreamList :
+            for port in self.App.StreamList :
                 if port is not selectedPort:
                     availableLink.append("[%d] - Stream %d %s" %(port.id,port.id,(" Linked " if port.id in selectedPort.linkedPort else "")))
                 else : 
@@ -344,7 +344,7 @@ class TerminalUserInterface :
                 return self.LinkPort_link_menu(selectedPort)
         return self.LinkPort_menu()
 
-    def ConfigureMenu_SubMenu(self , selectedPort : PortConfig):
+    def ConfigureMenu_SubMenu(self , selectedPort : Stream):
             terminalMenu = TerminalMenu(self.configureMenuSubmenuItems , clear_screen= False , title=f"Configuration Menu : \n Change Streams {selectedPort.id} configs \n")
             ConfigureMenuEntryIndex = terminalMenu.show()
             match ConfigureMenuEntryIndex :
@@ -354,7 +354,7 @@ class TerminalUserInterface :
                 case 3 : self.Configure_Stream_Logging_menu(selectedPort)
                 case _ : return self.ConfigureMenu()
                 
-    def Configure_Stream_StreamType_menu(self,selectedPort : PortConfig):
+    def Configure_Stream_StreamType_menu(self,selectedPort : Stream):
         def Configure_Stream_TCP_menu():
             TCPSettings_menu_Items : list = ["[q] - Back"]
 
@@ -423,7 +423,7 @@ class TerminalUserInterface :
                 found = False
                 for AvailablePort in AvailableStreams :
                     
-                    for port in self.Streams.StreamList:
+                    for port in self.App.StreamList:
                         if port.serialSettings is not None:
                             if port.serialSettings.port is not None:
                                 if AvailablePort[0] in port.serialSettings.port :
@@ -641,7 +641,7 @@ class TerminalUserInterface :
                 case 3 : return Configure_Stream_NTRIP_menu()      
                 case _ : return self.ConfigureMenu_SubMenu(selectedPort)
     
-    def Configure_Stream_Script_menu(self, selectedPort : PortConfig , startup : bool):
+    def Configure_Stream_Script_menu(self, selectedPort : Stream , startup : bool):
         if startup : 
             configureScriptMenuItems=[f"[1] - Startup Script - {selectedPort.sendStartupScript}",f"[2] - Script file - {selectedPort.startupScript}","[q] - Back"]
         else :
@@ -673,7 +673,7 @@ class TerminalUserInterface :
             case 1 : return Configure_ScriptFile_menu()
             case _ : return self.ConfigureMenu()
     
-    def Configure_Stream_Logging_menu(self,selectedPort : PortConfig ):
+    def Configure_Stream_Logging_menu(self,selectedPort : Stream ):
         
         configureLoggingMenuItems=[f"[1] - Logging - {str(selectedPort.logging)}",f"[2] - Logging Filename - {selectedPort.loggingFile}","[q] - Back"]
         
@@ -700,7 +700,7 @@ class TerminalUserInterface :
           
     
     
-    def getSettingsTitle(self, selectedPort : PortConfig):
+    def getSettingsTitle(self, selectedPort : Stream):
         currentSettings = selectedPort.toString()
         if currentSettings is None :
             return "\n No settings"

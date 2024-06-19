@@ -1,19 +1,21 @@
 import threading
-from ..StreamConfig import *
+from ..StreamConfig.Stream import *
+from ..StreamConfig.App import *
+from ..StreamSettings import SerialSettings ,TcpSettings , UdpSettings
 from ..constants import *
 import copy
 import PySide6.QtAsyncio as QtAsyncio
-from PySide6.QtCore import QSize, Qt , QRegularExpression , QThread , Signal
-from PySide6.QtGui import QIntValidator , QRegularExpressionValidator,QTextCursor,QAction,QIcon
+from PySide6.QtCore import QSize, Qt , QRegularExpression , QUrl, QThread , Signal
+from PySide6.QtGui import  QRegularExpressionValidator,QTextCursor,QAction,QIcon,QDesktopServices,QPixmap
 from PySide6.QtWidgets import (QMainWindow, QApplication, QCheckBox, QComboBox,
                                QCommandLinkButton, QDateTimeEdit, QDial,
                                QDialog, QDialogButtonBox, QFileSystemModel,
                                QGridLayout, QGroupBox, QHBoxLayout, QLabel,
                                QLineEdit, QListView, QMenu, QPlainTextEdit,
                                QProgressBar, QPushButton, QRadioButton,
-                               QScrollBar, QSizePolicy, QSlider, QSpinBox,
+                               QScrollBar, QSizePolicy, QMessageBox, QSpinBox,
                                QStyleFactory, QTableWidget, QTabWidget,
-                               QTextBrowser, QTextEdit, QToolBox, QToolButton,
+                               QTextBrowser, QTextEdit,
                                QTreeView, QVBoxLayout, QWidget, QInputDialog,QFileDialog)
 
 
@@ -33,16 +35,13 @@ def TrioWidgets(widget1,widget2,widget3) -> QHBoxLayout:
     return result
 
 
-
-
-
 class GraphicalUserInterface(QMainWindow):
     
-    def __init__(self, streams : Streams) -> None:
+    def __init__(self, app : App) -> None:
         super().__init__()
         self.setFixedSize(950,750)
         self.setWindowIcon(QIcon(DATAFILESPATH + 'pyDatalink_icon.png'))
-        self.streams : Streams = streams
+        self.app : App = app
         self.streamsWidget : list[ConnectionCard] = []
         self.setWindowTitle(APPNAME)
         
@@ -52,18 +51,12 @@ class GraphicalUserInterface(QMainWindow):
         # Create a menu
         fileMenu = menuBar.addMenu('File')
         
-        # IDEA -  TO DO 
-        #confMenu = menuBar.addMenu('Config')
-        #Save current Config
-        #Load config
-        #Change config
-        
-        # Create Preferences 
+        # Preferences action
         preferenceAction = QAction("Preferences",self)
         preferenceAction.setShortcut('Ctrl+P')
         preferenceAction.triggered.connect(lambda p : self.openPreferenceInterface())
         
-        # Create exit action
+        # exit action
         exitAction = QAction('Exit', self)
         exitAction.setShortcut('Ctrl+Q')
         exitAction.triggered.connect(self.close)
@@ -72,13 +65,34 @@ class GraphicalUserInterface(QMainWindow):
         fileMenu.addSeparator()
         fileMenu.addAction(exitAction)
         
+        # IDEA -  TO DO 
+        #confMenu = menuBar.addMenu('Config')
+        #Save current Config
+        #Load config
+        #Change config
+        
+        # github page
+        githubPageAction = QAction(QIcon(DATAFILESPATH +"Github_icon.png"),"GitHub Repository", self)
+        githubPageAction.triggered.connect(lambda : self.openLink())
+        
+        # About action
+        aboutAction = QAction(QIcon(DATAFILESPATH + 'pyDatalink_icon.png'),"About",self)
+        aboutAction.triggered.connect(lambda p : self.openAboutDialog())
+        
+        #Help Menu
+        helpMenu = menuBar.addMenu("Help")
+        helpMenu.addAction(githubPageAction)
+        helpMenu.addSeparator()
+        helpMenu.addAction(aboutAction)
+        
+        
         
         #Main Window layout
         mainLayout = QGridLayout()
         connectionCardLayout = QVBoxLayout()
         connectionCardLineLayout = QHBoxLayout()
-        for i in range(self.streams.maxStream):
-            newCard = ConnectionCard(i,self.streams.StreamList[i],self.streams.maxStream)
+        for i in range(self.app.maxStream):
+            newCard = ConnectionCard(i,self.app.StreamList[i],self.app.maxStream)
             self.streamsWidget.append(newCard)
             connectionCardLineLayout.addWidget(newCard.getWidget())
             if connectionCardLineLayout.count() == 3 :
@@ -102,15 +116,24 @@ class GraphicalUserInterface(QMainWindow):
         
         
     def openPreferenceInterface(self):
-        configureDialog = PreferencesInterface(self.streams.preferences)
+        configureDialog = PreferencesInterface(self.app.preferences)
         configureDialog.exec_()
         
+    def openAboutDialog(self):
+        aboutDialog = AboutDialog()
+        aboutDialog.exec_()
+        
+    def openLink(self):
+        url = QUrl("https://github.com/septentrio-gnss/Septentrio-PyDataLink")
+        if not QDesktopServices.openUrl(url):
+            QMessageBox.warning(self, "Error", "Couldn't open the web page")
+        
     def closeEvent(self,event):
-        self.streams.CloseAll()
+        self.app.CloseAll()
         QApplication.quit()
 
 class ConnectionCard :    
-    def __init__(self,id : int ,stream : PortConfig , maxStreams : int ) -> None:
+    def __init__(self,id : int ,stream : Stream , maxStreams : int ) -> None:
         self.stream = stream
         self.id = id
         self.maxStreams = maxStreams
@@ -191,7 +214,7 @@ class ConnectionCard :
     def toggleLinkedPort(self , linkindex):
         self.stream.UpdatelinkedPort(linkindex)
     
-    def openConfigureInterface(self,stream : PortConfig = None):
+    def openConfigureInterface(self,stream : Stream):
         configureDialog = ConfigureInterface(stream)
         configureDialog.accepted.connect(lambda : self.refreshCards())
         configureDialog.exec_()
@@ -214,9 +237,9 @@ class ConnectionCard :
                 self.connectButton.setText("Disconnect")
             except Exception as e : 
                 self.status.setText("Couldn't connect")
-                if len(e.args) > 2 :
+                if len(e.args) > 1  :
                     self.status.setToolTip(str(e.args[1]))
-                else:
+                else :
                     self.status.setToolTip(str(e.args[0]))
         else :
             try : 
@@ -226,7 +249,10 @@ class ConnectionCard :
                 self.connectButton.setText("Connect")
             except Exception as e : 
                 self.status.setText(f"Couldn't Disconnect")
-                self.status.setToolTip(str(e.args[1]))
+                if len(e.args) > 1  :
+                    self.status.setToolTip(str(e.args[1]))
+                else :
+                    self.status.setToolTip(str(e.args[0]))
                 
     def showData(self):
         if self.stream.ShowInputData.is_set() or self.stream.ShowOutputData.is_set():
@@ -244,7 +270,7 @@ class ConnectionCard :
    
         
 class ConfigureInterface(QDialog) :
-    def __init__(self , stream : PortConfig  = None) -> None:
+    def __init__(self , stream : Stream ) -> None:
         super().__init__()
         self.setWindowTitle(f"Configure Connection {stream.id}")
         self.setWindowIcon(QIcon(DATAFILESPATH + 'pyDatalink_icon.png'))
@@ -313,7 +339,7 @@ class ConfigureInterface(QDialog) :
         logBoxLayout = QVBoxLayout(logBox)
         
         logCheckBox = QCheckBox()
-        closeScriptCheckBox.setChecked(self.stream.logging)
+        logCheckBox.setChecked(self.stream.logging)
         logLabel = QLabel("Log File : ")
         logEdit = QLineEdit()
         logEdit.setDisabled(not self.stream.logging)
@@ -332,8 +358,7 @@ class ConfigureInterface(QDialog) :
         streamTypeList.currentIndexChanged.connect(lambda : self.stream.setStreamType(streamTypeList.currentData()))
         openScriptCheckBox.checkStateChanged.connect(lambda : self.openScriptFile(openScriptEdit,openScriptCheckBox , True))
         closeScriptCheckBox.checkStateChanged.connect(lambda : self.openScriptFile(closeScriptEdit,closeScriptCheckBox , False))
-        logCheckBox.checkStateChanged.connect(lambda :self)
-        
+        logCheckBox.checkStateChanged.connect(lambda : self.selectLogFile(logEdit ,logCheckBox ))
         return result
     
         
@@ -358,7 +383,7 @@ class ConfigureInterface(QDialog) :
         
         #Baudrate
         baudRateList = QComboBox()
-        for baudrate in BaudRate :
+        for baudrate in SerialSettings.BaudRate :
             baudRateList.addItem(baudrate.value, baudrate)
         if self.stream.serialSettings.baudrate is not None :
             index = baudRateList.findData(self.stream.serialSettings.baudrate) 
@@ -368,7 +393,7 @@ class ConfigureInterface(QDialog) :
         
         #Parity
         parityList = QComboBox()
-        for parity in Parity :
+        for parity in SerialSettings.Parity :
             parityList.addItem( parity.value + " - " +  parity.name.replace("PARITY_","") , parity )
         if self.stream.serialSettings.parity is not None :
             index = parityList.findData(self.stream.serialSettings.parity) 
@@ -378,7 +403,7 @@ class ConfigureInterface(QDialog) :
         
         #Stop bits
         stopBitsList = QComboBox()
-        for stopbits in StopBits :
+        for stopbits in SerialSettings.StopBits :
             stopBitsList.addItem(str(stopbits.value),stopbits)
         if self.stream.serialSettings.stopbits is not None :
             index = stopBitsList.findData(self.stream.serialSettings.stopbits) 
@@ -388,7 +413,7 @@ class ConfigureInterface(QDialog) :
         
          #ByteSize
         byteSizeList = QComboBox()
-        for bytesize in ByteSize :
+        for bytesize in SerialSettings.ByteSize :
             byteSizeList.addItem(str(bytesize.value) , bytesize)
         index = byteSizeList.findData(self.stream.serialSettings.bytesize) 
         byteSizeList.setCurrentIndex(index)
@@ -532,7 +557,7 @@ class ConfigureInterface(QDialog) :
         specificHost.toggled.connect(lambda : hostName.setDisabled( not specificHost.isChecked()))
         
         hostName.editingFinished.connect(lambda : self.stream.udpSettings.setHost(hostName.text()))
-        Port.editingFinished.connect(lambda : self.stream.udpSettings.setPort(Port.text()))
+        Port.editingFinished.connect(lambda : self.stream.udpSettings.setPort(int(Port.text())))
         dataflowList.currentIndexChanged.connect(lambda : self.stream.udpSettings.set_DataFlow(dataflowList.currentData()))
         
         return result
@@ -687,21 +712,26 @@ class ConfigureInterface(QDialog) :
             self.updatethread.start()
             
     def taskGetNewSourceTable(self):
-        if len(self.ntriphostName.text()) > 0:
-            if self.stream.ntripClient.ntripSettings.sourceTable is not None:
-                    if len(self.stream.ntripClient.ntripSettings.sourceTable) != 0:
-                        for source in self.stream.ntripClient.ntripSettings.sourceTable:
-                                self.mountPointList.addItem(source.mountpoint, source.mountpoint)
-                                if self.stream.ntripClient.ntripSettings.mountpoint is not None:
-                                    index = self.mountPointList.findData(self.stream.ntripClient.ntripSettings.mountpoint)
-                                else : 
-                                    index : int = 3
-                                self.mountPointList.setPlaceholderText("")
-                                self.mountPointList.setCurrentIndex(index)
-            else :
-                self.mountPointList.setPlaceholderText("List unavailable")            
-        else:
+        if len(self.ntriphostName.text()) < 1 :
             self.mountPointList.setPlaceholderText("List unavailable")
+        else :
+            try : 
+                self.stream.ntripClient.set_Settings_Host(self.ntriphostName.text())
+                
+                if len(self.stream.ntripClient.ntripSettings.sourceTable) != 0:
+                    for source in self.stream.ntripClient.ntripSettings.sourceTable:
+                            self.mountPointList.addItem(source.mountpoint, source.mountpoint)
+                            if self.stream.ntripClient.ntripSettings.mountpoint is not None:
+                                index = self.mountPointList.findData(self.stream.ntripClient.ntripSettings.mountpoint)
+                            else : 
+                                index : int = 3
+                            self.mountPointList.setPlaceholderText("")
+                            self.mountPointList.setCurrentIndex(index)   
+                else : 
+                    self.mountPointList.setPlaceholderText("List unavailable")
+            except :
+                self.mountPointList.setPlaceholderText("List unavailable")
+                        
             
     def bottomButtonLayout(self):
                 
@@ -748,6 +778,23 @@ class ConfigureInterface(QDialog) :
                 checkbox.click()
         else :
             inputWidget.setDisabled(True)
+    def selectLogFile(self , logedit : QLineEdit  , checkbox : QCheckBox):
+        if checkbox.isChecked(): 
+            fileName = QFileDialog.getSaveFileName(self,"Select log file ")
+            if fileName[0] != '' and fileName[1] != '':
+                try : 
+                    self.stream.setLoggingFileName(fileName[0])
+                    self.stream.setLogging()
+                    logedit.setDisabled(False)
+                    logedit.setText(fileName[0])
+                except : 
+                    checkbox.click()
+                    logedit.setDisabled(True)
+            else: 
+                checkbox.click()
+        else :
+            logedit.setDisabled(True)
+        
     
     def selectCertFile(self):
             fileName = QFileDialog.getOpenFileName(self,"Select certificat")
@@ -757,7 +804,7 @@ class ConfigureInterface(QDialog) :
                     self.cert.setText(fileName[0])
 class ShowDataInterface(QDialog):
 
-    def __init__(self,stream : PortConfig) -> None:
+    def __init__(self,stream : Stream) -> None:
         super().__init__()
         self.stream = stream
         self.setMinimumSize(350,300)
@@ -875,6 +922,8 @@ class PreferencesInterface(QDialog):
         
         self.preference = preference
         preferenceLayout = QVBoxLayout(self)
+        self.setWindowIcon(QIcon(DATAFILESPATH + 'pyDatalink_icon.png'))
+        self.setWindowTitle("Preferences")
         
         #Configuration File 
         generalBox = QGroupBox("General")
@@ -936,8 +985,49 @@ class PreferencesInterface(QDialog):
     def toggleStartupConnection(self, portid):
         self.preference.Connect[portid] = not self.preference.Connect[portid]
         
-           
         
+class AboutDialog(QDialog):
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowIcon(QIcon(DATAFILESPATH + 'pyDatalink_icon.png'))
+        self.setWindowTitle("About PyDatalink")
+        QBtn = QDialogButtonBox.Ok 
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        # Add Version
+        # add Link to github repo
+        # add Description
+        # Add Warning for still in testing
+        self.dialoglayout = QVBoxLayout()
+        
+        contentLayout = QVBoxLayout()
+        # logoLabel = QLabel()
+        # logo = QPixmap(DATAFILESPATH +"pyDatalink_Logo.png")
+        # logoLabel.setPixmap(logo)
+        # logoLabel.setFixedSize(200,100)
+        # logoLabel.setScaledContents(True)
+        # logoLabel.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        path = DATAFILESPATH +"pyDatalink_Logo.png"
+        html_content = f"""
+        <h1 style="color: blue;">Welcome to PySide6</h1>
+        <p>This is a QLabel displaying <b>HTML</b> content {path}.</p>
+        <img src= {path} alt="Image" width="400" height="300">
+        """
+        html_label = QLabel()
+        html_label.setText(html_content)
+        html_label.setScaledContents(True)
+        
+        message = QLabel("Version : 1.0.0")
+        contentLayout.addWidget(html_label)
+        contentLayout.addWidget(message)
+        
+        self.dialoglayout.addLayout(contentLayout)
+        self.dialoglayout.addWidget(self.buttonBox)
+        self.dialoglayout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.setLayout(self.dialoglayout)
+              
 class ConfigurationThread(QThread):
     finished = Signal()
 

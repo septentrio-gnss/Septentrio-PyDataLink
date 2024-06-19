@@ -30,25 +30,27 @@
 
 import threading
 import time
-from ..StreamConfig import *
+
+from src.StreamConfig import App
+from src.StreamConfig.Stream import Stream
 
 class CommandLineInterface: 
-    def __init__(self,streams : Streams , showdataId : int = None) -> None:
-        self.Streams = streams
+    def __init__(self,app : App , showdataId : int = None) -> None:
+        self.App = app
         self.showdataid = showdataId
 
     def print(self, message):
         print(message)
 
     def run(self):
-        if len(self.Streams.StreamList) == 0 : 
+        if len(self.App.StreamList) == 0 : 
             return 0
         else : 
             if self.showdataid is not None: 
                 target = self._showDataTask
             else :
                 target = self._showDataTransfert
-                self.showDataPort = self.Streams
+                self.showDataPort = self.App
                 
             stopShowDataEvent = threading.Event()
             stopShowDataEvent.clear()
@@ -57,21 +59,21 @@ class CommandLineInterface:
             input("Press Enter to close the program \n")
             stopShowDataEvent.set()
             showDataThread.join()
-            self.Streams.CloseAll()
+            self.App.CloseAll()
     
     
-    def _showDataTask(self,stopShowDataEvent, selectedPort : PortConfig):
+    def _showDataTask(self,stopShowDataEvent, selectedPort : Stream):
         while stopShowDataEvent.is_set() is False:
             if selectedPort.DataToShow.empty() is False :
                 print(selectedPort.DataToShow.get())
         return 0
     
-    def _showDataTransfert(self,stopShowDataEvent, stream : Streams):
+    def _showDataTransfert(self,stopShowDataEvent, app : App):
         speed = "\r"
         while stopShowDataEvent.is_set() is False:
             time.sleep(1)
             speed = "\r"
-            for port in stream.StreamList:
+            for port in app.StreamList:
                 speed += "Port "+ str(port.id) +" : in "+ str(port.dataTransferInput) + " kBps ; out "+ str(port.dataTransferOutput) + " kBps "
             print(speed, end="\r")    
         return 0

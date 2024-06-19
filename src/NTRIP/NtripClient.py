@@ -31,8 +31,9 @@ import base64
 import datetime
 import math
 from .NtripSourceTable import NtripSourceTable
-from .NtripSettings import NtripSettings , ConnectFailedError
+from .NtripSettings import NtripSettings
 import logging
+from ..constants import DEFAULTLOGFILELOGGER
 
 RAD2DEGREES = 180.0 / 3.141592653589793
 
@@ -49,13 +50,16 @@ class ClosingError(Exception):
 class NtripClient:
     
     def __init__(self, host : str = "" , port : int = 2101 , auth : bool = False, username : str = "" , password : str = "" , mountpoint :str = "",tls :bool =False ,
-                 fixedPos : bool = False , latitude : str = "00.000000000" , longitude : str = "000.000000000" , height : int = 0 , logFile : logging = None) -> None:
+                 fixedPos : bool = False , latitude : float = 00.00, longitude : float = 00.00 , height : int = 0 , debugLogging : bool = False) -> None:
                   
-        self.ntripSettings : NtripSettings = NtripSettings(host,port,auth,username,password,mountpoint,tls,fixedPos,latitude,longitude,height,logFile)
+        self.ntripSettings : NtripSettings = NtripSettings(host,port,auth,username,password,mountpoint,tls,fixedPos,latitude,longitude,height,debugLogging)
         self.socket = None
         self.connected : bool = False
-        self.fixedPosGga : str = None
-        self.logFile : logging = logFile
+        self.fixedPosGga : str 
+        if debugLogging :
+            self.logFile : logging.Logger = DEFAULTLOGFILELOGGER
+        else :
+            self.logFile = None
         
 
     def connect(self):

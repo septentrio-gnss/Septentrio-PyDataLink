@@ -35,39 +35,13 @@ Preferences class : save every preferences and options done previously
 """
 class Preferences : 
 
-    def __init__(self,maxStreams : int = 2, configName : str = "Datalink_Config" ,lineTermination :str = "\r\n"
-                 , ConfigFile : configparser.SectionProxy = None) -> None:
-        if ConfigFile is None:
+    def __init__(self,maxStreams : int = 2, configName : str = "Datalink_Config" ,lineTermination :str = "\r\n") -> None:
             self.maxStreams = maxStreams
             self.Connect : list[bool] = []
             self.configName : str = configName
             for i in range(maxStreams) :
                 self.Connect.append(False)
             self.lineTermination : str = lineTermination
-        else :
-            
-            try : 
-                self.maxStreams : int =  int(ConfigFile.get("numberOfPortPanels"))
-            except : 
-                self.maxStreams = maxStreams
-            self.Connect : list[bool] = []
-            for connectid in range(maxStreams):
-                try : 
-                    self.Connect.append( True if ConfigFile.get(f"connect{connectid}").lower() == "true" else False )
-                except : 
-                    self.Connect.append(False)
-            try : 
-                self.lineTermination :str = ConfigFile.get("lineTermination").replace("\\n","\n").replace("\\r","\r")
-            except : 
-                self.lineTermination : str = "\n\r"
-        
-            try: 
-                if len(ConfigFile.get("configName")) != 0 : 
-                    self.configName : str = str(ConfigFile.get("configName"))
-                else : 
-                    self.configName : str = configName
-            except : 
-                self.configName : str = configName
     
     def setMaxStream(self,newMaxStream : int ):
         """
@@ -105,16 +79,4 @@ class Preferences :
         """
         return self.lineTermination.replace("\n","\\n").replace("\r","\\r")
             
-    def SaveConfig(self , sectionName : str,SaveConfigFile  : configparser.ConfigParser): 
-        """
-            Add current class values in the configFile
-        Args:
-            sectionName (str): name of the current section
-            SaveConfigFile (configparser.ConfigParser): configparser of the configuration file
-        """
-        SaveConfigFile.set(sectionName , "configName" ,str(self.configName))       
-        SaveConfigFile.set(sectionName,"numberOfPortPanels",str(self.maxStreams))
-        SaveConfigFile.set(sectionName,"lineTermination",self.lineTermination.replace("\n","\\n").replace("\r","\\r"))
-        for connect , index in zip(self.Connect,range(len(self.Connect))):
-            connectString = "connect" + str(index)
-            SaveConfigFile.set(sectionName,connectString,str(connect))
+    

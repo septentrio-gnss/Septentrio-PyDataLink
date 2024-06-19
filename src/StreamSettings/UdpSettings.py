@@ -27,10 +27,10 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import configparser
 from enum import Enum
 import socket
 import logging
+from ..constants import DEFAULTLOGFILELOGGER
 
 class DataFlow(Enum):
     """
@@ -54,7 +54,7 @@ class UdpSettings:
         specificHost (str): The specific host IP address to bind to.
     """
 
-    def __init__(self , host : str =  "localhost", port : int = 28784 , dataflow : DataFlow = DataFlow.Both , specificHost : bool = False , logFile : logging =None) -> None:
+    def __init__(self , host : str =  "localhost", port : int = 28784 , dataflow : DataFlow = DataFlow.Both , specificHost : bool = False , debugLogging : bool =None) -> None:
         """
         Initializes a new instance of the UDPSettings class.
         
@@ -66,8 +66,10 @@ class UdpSettings:
         self.port : int = port
         self.DataFlow : DataFlow = dataflow
         self.specificHost : bool  = specificHost
-        self.logFile : logging = logFile
-
+        if debugLogging : 
+            self.logFile : logging.Logger = DEFAULTLOGFILELOGGER
+        else : 
+            self.logFile = None
 
 
     def connect(self) -> socket.socket:
@@ -134,14 +136,4 @@ class UdpSettings:
         """
         return f" Host : {self.host} \n Port : {self.port} \n SpecificHost : {self.specificHost} \n DataFlow : {self.DataFlow.name}\n"
    
-    def SaveConfig(self , sectionName : str,SaveConfigFile  : configparser.ConfigParser):
-        """
-            Add current class values in the configFile
-        Args:
-            sectionName (str): name of the current section
-            SaveConfigFile (configparser.ConfigParser): configparser of the configuration file
-        """
-        SaveConfigFile.set(sectionName,"hostNameUDP", self.host )
-        SaveConfigFile.set(sectionName,"portNumberUDP",str(self.port))
-        SaveConfigFile.set(sectionName,"specificIpUDP",str(self.specificHost))
-        SaveConfigFile.set(sectionName,"dataDirUDP",str(self.DataFlow.value))
+    
