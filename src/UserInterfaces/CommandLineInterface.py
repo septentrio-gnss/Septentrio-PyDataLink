@@ -43,7 +43,7 @@ class CommandLineInterface:
         print(message)
 
     def run(self):
-        if len(self.App.StreamList) == 0 : 
+        if len(self.App.stream_list) == 0 : 
             return 0
         else : 
             if self.showdataid is not None: 
@@ -59,13 +59,13 @@ class CommandLineInterface:
             input("Press Enter to close the program \n")
             stopShowDataEvent.set()
             showDataThread.join()
-            self.App.CloseAll()
+            self.App.close_all()
     
     
     def _showDataTask(self,stopShowDataEvent, selectedPort : Stream):
         while stopShowDataEvent.is_set() is False:
-            if selectedPort.DataToShow.empty() is False :
-                print(selectedPort.DataToShow.get())
+            if selectedPort.data_to_show.empty() is False :
+                print(selectedPort.data_to_show.get())
         return 0
     
     def _showDataTransfert(self,stopShowDataEvent, app : App):
@@ -73,8 +73,8 @@ class CommandLineInterface:
         while stopShowDataEvent.is_set() is False:
             time.sleep(1)
             speed = "\r"
-            for port in app.StreamList:
-                speed += "Port "+ str(port.id) +" : in "+ str(port.dataTransferInput) + " kBps ; out "+ str(port.dataTransferOutput) + " kBps "
+            for port in app.stream_list:
+                speed += "Port "+ str(port.id) +" : in "+ str(port.data_transfer_input) + " kBps ; out "+ str(port.data_transfer_output) + " kBps "
             print(speed, end="\r")    
         return 0
         

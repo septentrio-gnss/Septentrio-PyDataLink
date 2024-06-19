@@ -178,7 +178,7 @@ python pyDatalinkApp.py -m TUI
 On this menu you can find the following items :
 
 * [Configuration](#Configure)
-* [Connect / Disconnect](#Connect-Disconnect)
+* [connect / disconnect](#connect-disconnect)
 * [ShowData](#Show-Data)
 * [Link](#Link)
 * [Preferences](#Preferences)
@@ -224,7 +224,7 @@ The Configure menu allow you to choose the type of communication you want to use
 | MountPoint | *Contact your ntrip service provider* | - | Mountpoint of the ntrip server , depend on the provider |
 |
 
-## Connect Disconnect
+## connect disconnect
 
 In this section, you can start or stop a connection. To connect or disconnect, simply select a connection then select with type of stream oyu want to use and press `enter`. If the connection fails, a message will be displayed above the menu indicating the issue that needs to be fixed before retrying. If the connection is successful, the status next to the connection name will switch between "Connected" and "Disconnected".
 

@@ -6,48 +6,47 @@ from ..StreamSettings.SerialSettings import *
 from ..StreamSettings.TcpSettings import *
 from ..StreamConfig.Stream import StreamType , Stream
 
-def CommandLineConfig(stream : Stream,commandLineConfig : str):
+def command_line_config(stream : Stream,command_line_config : str):
     """
     Configure a Stream with a single line of configuration 
     
     Args:
-        commandLineConfig (str): Configuration line 
+        command_line_config (str): Configuration line 
 
     """
-    PortToLink = []
+    port_to_link = []
     try :
-            streamType :str = commandLineConfig.split("://")[0]
-            config: str = commandLineConfig.split("://")[1]
-            if '#' in config : 
-                PortToLink = config.split("#")[1].split(",")
-                config = config.split("#")[0]
-            if streamType.lower() == "serial":
-                ConfigSerialStream(stream , commandConfig=config)
-            elif streamType.lower() == "tcpcli":
-                ConfigTCPStream(stream ,isServer=False , commandConfig=config)
-            elif streamType.lower() == "tcpsrv":
-                ConfigTCPStream(stream ,isServer=True, commandConfig=config)
-            elif streamType.lower() == "udp":
-                ConfigUDPStream(stream ,commandConfig=config)
-            elif streamType.lower() == "udpspe":
-                ConfigUDPStream(stream ,specificHost=True, commandConfig= config)
-            elif streamType.lower() == "ntrip":
-                ConfigNTRIPStream(stream ,config)
-                
-    except Exception as e  : 
-            raise Exception(f"config line is not correct ! , {e}")
+        stream_type :str = command_line_config.split("://")[0]
+        config: str = command_line_config.split("://")[1]
+        if '#' in config :
+            port_to_link = config.split("#")[1].split(",")
+            config = config.split("#")[0]
+        if stream_type.lower() == "serial":
+            ConfigSerialStream(stream , commandConfig=config)
+        elif stream_type.lower() == "tcpcli":
+            ConfigTCPStream(stream ,is_server=False , commandConfig=config)
+        elif stream_type.lower() == "tcpsrv":
+            ConfigTCPStream(stream ,is_server=True, commandConfig=config)
+        elif stream_type.lower() == "udp":
+            ConfigUDPStream(stream ,commandConfig=config)
+        elif stream_type.lower() == "udpspe":
+            ConfigUDPStream(stream ,specific_host=True, commandConfig= config)
+        elif stream_type.lower() == "ntrip":
+            ConfigNTRIPStream(stream ,config)
 
-    if len(PortToLink) > 0 :
-        for i in PortToLink:
+    except Exception as e  :
+        raise Exception(f"config line is not correct ! , {e}")
+
+    if len(port_to_link) > 0 :
+        for i in port_to_link:
             try :
                 link = int(i)
                 if link != stream.id:
-                    stream.linkedPort.append(link)
-            except :
-                pass
+                    stream.linked_ports.append(link)
+            except : pass
     try:
-        stream.Connect(stream.StreamType)
-    except Exception as e: 
+        stream.connect(stream.stream_type)
+    except Exception as e:
         raise e
 
 def ConfigNTRIPStream(stream : Stream ,CommandConfig : str ):
@@ -70,16 +69,16 @@ def ConfigNTRIPStream(stream : Stream ,CommandConfig : str ):
         raise Exception("Missing a MountPoint paremeter !")
     
     try : 
-        stream.ntripClient = NtripClient(host = host[0], port = int(host[1].split("/")[0]), auth= (True if len(credentials[0]) > 0 and len(credentials[1]) > 0  else False) ,username= credentials[0],password= credentials[1],mountpoint=mountpoint[1])
-        stream.StreamType = StreamType.NTRIP
+        stream.ntrip_client = NtripClient(host = host[0], port = int(host[1].split("/")[0]), auth= (True if len(credentials[0]) > 0 and len(credentials[1]) > 0  else False) ,username= credentials[0],password= credentials[1],mountpoint=mountpoint[1])
+        stream.stream_type = StreamType.NTRIP
     except Exception as e : 
         raise Exception(f"Error : given parameters for a NTRIP Client stream are incorrect : \n{e}")
     
-def ConfigUDPStream(stream : Stream,specificHost : bool = False, commandConfig : str = None):
+def ConfigUDPStream(stream : Stream,specific_host : bool = False, commandConfig : str = None):
     """
         Init a UDP stream with a configuration line
     Args:
-        specificHost (bool, optional): if True the UDP Stream will stream only to a specific host name. Defaults to False.
+        specific_host (bool, optional): if True the UDP Stream will stream only to a specific host name. Defaults to False.
         commandConfig (str, optional): Configuration line. Defaults to None.
 
     Raises:
@@ -87,28 +86,28 @@ def ConfigUDPStream(stream : Stream,specificHost : bool = False, commandConfig :
         Exception: Given parameter incorrect 
         Exception: Given parameter incorrect (Specific host)
     """
-    if specificHost :
+    if specific_host :
         config = commandConfig.split(":")[0]
         if len(config) != 2 : 
             raise Exception("Error : too few or too much parameter") 
         else :
             try:
-                stream.udpSettings = UdpSettings(host=config[0],  port=int(config[1]), specificHost=specificHost)
-                stream.StreamType = StreamType.UDP
+                stream.udp_settings = UdpSettings(host=config[0],  port=int(config[1]), specific_host=specific_host)
+                stream.stream_type = StreamType.UDP
             except Exception as e : 
                 raise Exception("Error : given parameter for a UDP stream are incorrect : \n{e}")
     else :
         try:
-            stream.udpSettings = UdpSettings(port=int(commandConfig))
-            stream.StreamType = StreamType.UDP
+            stream.udp_settings = UdpSettings(port=int(commandConfig))
+            stream.stream_type = StreamType.UDP
         except Exception as e : 
             raise Exception("Error : given parameter for a UDP stream are incorrect : \n{e}")      
     
-def ConfigTCPStream(stream : Stream,isServer : bool = False ,commandConfig : str = None) -> None:
+def ConfigTCPStream(stream : Stream,is_server : bool = False ,commandConfig : str = None) -> None:
     """
         Init a TCP stream with a configuration line
     Args:
-        isServer (bool, optional): If True the TCP stream will be configure as a Server. Defaults to False.
+        is_server (bool, optional): If True the TCP stream will be configure as a Server. Defaults to False.
         commandConfig (str, optional): Configuration line . Defaults to None.
 
     Raises:
@@ -116,20 +115,20 @@ def ConfigTCPStream(stream : Stream,isServer : bool = False ,commandConfig : str
         Exception: Given parameter incorrect (Server)
         Exception: Given parameter incorrect (Client)
     """
-    if isServer : 
+    if is_server : 
         config = commandConfig.split(":")
         if len(config) != 2 : 
             raise Exception("Error : too few or too much parameter") 
         try : 
-            stream.tcpSettings = TcpSettings(host=config[0] , port=int(config[1]), streamMode= StreamMode.SERVER)        
+            stream.tcp_settings = TcpSettings(host=config[0] , port=int(config[1]), stream_mode= StreamMode.SERVER)        
         except Exception as e : 
             raise Exception("Error : given parameters for a TCP Server stream are incorrect : \n{e}")   
     else : 
         try : 
-            stream.tcpSettings = TcpSettings(port=int(commandConfig) , streamMode= StreamMode.CLIENT)
+            stream.tcp_settings = TcpSettings(port=int(commandConfig) , stream_mode= StreamMode.CLIENT)
         except Exception as e : 
             raise Exception("Error : given parameters for a TCP Client stream are incorrect : \n{e}")   
-    stream.StreamType = StreamType.TCP
+    stream.stream_type = StreamType.TCP
     
 def ConfigSerialStream(stream : Stream,commandConfig :str) -> None:
     """
@@ -143,18 +142,18 @@ def ConfigSerialStream(stream : Stream,commandConfig :str) -> None:
         Exception: If given argument are Incorrect
     """
     config = commandConfig.split(":")
-    if len(config) != 6 : 
+    if len(config) != 6 :
         raise Exception("Error : too few or too much parameter") 
     port : str = config[0]
     try :
             baudrate : BaudRate = BaudRate(config[1])
     except : 
             baudrate : BaudRate = BaudRate.eBAUD115200
-    try :    
+    try :
             parity : Parity = Parity(config[2])
     except : 
             parity : Parity = Parity.PARITY_NONE
-    try : 
+    try :
             stopbits : StopBits = StopBits(config[3])
     except :
             stopbits : StopBits = StopBits.STOPBITS_ONE
@@ -165,7 +164,7 @@ def ConfigSerialStream(stream : Stream,commandConfig :str) -> None:
                 
     rtscts : bool = True if config[5] == "1" else False
     try :
-        stream.serialSettings = SerialSettings(Port= port , baudrate=baudrate , parity=parity , stopbits=stopbits,bytesize=bytesize , Rtscts=rtscts)
-        stream.StreamType = StreamType.Serial
+        stream.serial_settings = SerialSettings(port  = port , baudrate=baudrate , parity=parity , stopbits=stopbits,bytesize=bytesize , rtscts=rtscts)
+        stream.stream_type = StreamType.Serial
     except Exception as e :
         raise Exception("Error : given parameters for a Serial stream are incorrect : \n{e}")   

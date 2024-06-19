@@ -1,21 +1,21 @@
 # ###############################################################################
-# 
+#
 # Copyright (c) 2024, Septentrio
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
-# 
+#
 # 1. Redistributions of source code must retain the above copyright notice, this
 #    list of conditions and the following disclaimer.
-# 
+#
 # 2. Redistributions in binary form must reproduce the above copyright notice,
 #    this list of conditions and the following disclaimer in the documentation
 #    and/or other materials provided with the distribution.
-# 
+#
 # 3. Neither the name of the copyright holder nor the names of its
 #    contributors may be used to endorse or promote products derived from
 #    this software without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -34,28 +34,33 @@ import logging
 from ..constants import DEFAULTLOGFILELOGGER
 
 class StreamMode(Enum):
+    """ Stream mode of the TCP port
+    """
     CLIENT = "Client"
     SERVER = "Server"
 
 
-class TcpSettings: 
+class TcpSettings:
     """
     Represents the TCP settings for a stream.
     
     """
 
-    def __init__(self , host : str = "localhost" , port : int =28784 , streamMode : StreamMode = StreamMode.CLIENT ,  debugLogging : bool =False) -> None:
-            self.host : str = host
-            self.port : int = port
-            self.StreamMode : StreamMode = streamMode
-            if self.StreamMode == StreamMode.SERVER : 
-                self.host = ''
-            
-            if debugLogging : 
-                self.logFile : logging.Logger = DEFAULTLOGFILELOGGER
-            else : 
-                self.logFile = None # type: ignore
-       
+    def __init__(self , host : str = "localhost" , port : int =28784 ,
+                 stream_mode : StreamMode = StreamMode.CLIENT ,
+                 debug_logging : bool =False) -> None:
+
+        self.host : str = host
+        self.port : int = port
+        self.stream_mode : StreamMode = stream_mode
+        if self.stream_mode == StreamMode.SERVER :
+            self.host = ''
+
+        if debug_logging :
+            self.log_file : logging.Logger = DEFAULTLOGFILELOGGER
+        else :
+            self.log_file = None # type: ignore
+
 
 
     def connect(self) -> socket.socket:
@@ -68,75 +73,72 @@ class TcpSettings:
         Raises:
             socket.error: If there is an error while connecting.
         """
-        try : 
+        try :
             newsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             newsocket.settimeout(5)
         except socket.error as e :
-            if self.logFile is not None :
-                self.logFile.error("Failed to start socket : %s" , e)
-            raise e 
-        match self.StreamMode : 
+            if self.log_file is not None :
+                self.log_file.error("Failed to start socket : %s" , e)
+            raise e
+        match self.stream_mode :
             case StreamMode.CLIENT :
-                try : 
+                try :
                     newsocket.connect((self.host, self.port))
                     return newsocket
                 except socket.error as e :
-                    if self.logFile is not None : 
-                        self.logFile.error("Failed to open the Client socket ( host : %s and port : %s) : %s",self.host , self.port , e)
+                    if self.log_file is not None :
+                        self.log_file.error("Failed to open the Client socket ( host : %s and port : %s) : %s",self.host , self.port , e)
                     raise e
             case StreamMode.SERVER :
-                try : 
+                try :
                     newsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                     newsocket.bind(('', self.port))
                     return newsocket
                 except socket.error as e :
-                    if self.logFile is not None : 
-                        self.logFile.error("Failed to open the Server socket : %s" , e)
+                    if self.log_file is not None :
+                        self.log_file.error("Failed to open the Server socket : %s" , e)
                     raise e
 
 
-    def setHost(self, NewHost : str):
+    def set_host(self, new_host : str):
         """
         set the Host name of the TCP Stream
         
         Args:
-            NewHost (str): the new Host name
+            new_host (str): the new Host name
         """
-        self.host = NewHost
+        self.host = new_host
 
-    def setPort(self, NewPort : int):
+    def set_port(self, new_port : int):
         """
         set the Port of the TCP Stream
 
         Args:
-            NewPort (int): The new Port 
+            new_port (int): The new Port 
         """
-        self.port = NewPort
+        self.port = new_port
 
-    def set_StreamMode(self, NewMode : StreamMode):
+    def set_stream_mode(self, new_mode : StreamMode):
         """
         set the stream mode of the tcp stream.
         Args:
-            NewMode (StreamMode): The new stream mode.
+            new_mode (StreamMode): The new stream mode.
         """
-        self.StreamMode = NewMode
-        
-    def isServer(self):
+        self.stream_mode = new_mode
+
+    def is_server(self):
         """
         Return current stream mode of the stream
         Returns:
             Bool : True if the current Stream is in Server mode , False otherwise
         """
-        return True if self.StreamMode == StreamMode.SERVER else False
-        
-    def toString(self) -> str :
+        return True if self.stream_mode == StreamMode.SERVER else False
+
+    def to_string(self) -> str :
         """
         Return current class as a string
 
         Returns:
             str: class as string
         """
-        return f" Host : {self.host} \n Port :{self.port} \n StreamMode : {self.StreamMode.value}"
-    
-    
-    
+        return f" Host : {self.host} \n Port :{self.port} \n StreamMode : {self.stream_mode.value}"

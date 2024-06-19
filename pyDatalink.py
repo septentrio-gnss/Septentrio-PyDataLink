@@ -51,7 +51,7 @@ from src.UserInterfaces import CommandLineInterface
 
     
 def checkDataFolder():
-    if os.path.exists(DATAPATH) is not True : 
+    if os.path.exists(DATAPATH) is not True :
         os.mkdir(DATAPATH)
     if os.path.exists( CONFIGPATH ) is not True:
         os.mkdir(CONFIGPATH )
@@ -77,19 +77,19 @@ class DatalinkApp:
                                 print(f"Error : streams id \"{args.ShowData}\" is not correct , please enter a valid ID !")
                                 return 
                     
-                    self.app = App(maxStream=len(args.Streams),streamSettingsList=args.Streams , configurationType= ConfigurationType.CMDLINE)
+                    self.app = App(max_stream=len(args.Streams),stream_settings_list=args.Streams , configuration_type= ConfigurationType.CMDLINE)
                     if args.ShowData is not None :
-                        if show <= len(self.app.StreamList):
-                            self.showDataPort=self.app.StreamList[show - 1]
-                            self.showDataPort.ToggleAllDataVisibility()
+                        if show <= len(self.app.stream_list):
+                            self.showDataPort=self.app.stream_list[show - 1]
+                            self.showDataPort.toggle_all_data_visibility()
                     
         else : 
                 if os.path.exists(args.ConfigPath): 
-                    self.app = App(configurationType= ConfigurationType.FILE,configFile=args.ConfigPath, debugLogging=True)
+                    self.app = App(configuration_type= ConfigurationType.FILE,config_file=args.ConfigPath, debug_logging=True)
                 elif os.path.exists(DEFAULTCONFIGFILE) : 
-                    self.app = App(configurationType= ConfigurationType.FILE , configFile=DEFAULTCONFIGFILE , debugLogging=True)
+                    self.app = App(configuration_type= ConfigurationType.FILE , config_file=DEFAULTCONFIGFILE , debug_logging=True)
                 else :
-                    self.app = App(debugLogging=True)
+                    self.app = App(debug_logging=True)
         self.Start()
                 
     def Start(self) -> None : 

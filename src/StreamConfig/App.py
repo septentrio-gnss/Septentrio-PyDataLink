@@ -1,21 +1,21 @@
 # ###############################################################################
-# 
+#
 # Copyright (c) 2024, Septentrio
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
-# 
+#
 # 1. Redistributions of source code must retain the above copyright notice, this
 #    list of conditions and the following disclaimer.
-# 
+#
 # 2. Redistributions in binary form must reproduce the above copyright notice,
 #    this list of conditions and the following disclaimer in the documentation
 #    and/or other materials provided with the distribution.
-# 
+#
 # 3. Neither the name of the copyright holder nor the names of its
 #    contributors may be used to endorse or promote products derived from
 #    this software without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -27,114 +27,111 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import configparser
 from enum import Enum
 import queue
 from .Preferences import Preferences
 from .Stream import Stream
-from ..Configuration import SaveConfiguration , CommandLineConfiguration , FileConfiguration 
-import configparser
+from ..Configuration import SaveConfiguration , CommandLineConfiguration , FileConfiguration
 
-"""
-    Class which initialise every Streams.
-    Depending on the input it can be configure via a configuration file or via a configuration list
-    
-"""
+
 class ConfigurationType(Enum):
+    """Type of configuration that need to be executed 
+    """
     FILE = 0
     CMDLINE = 1
     DEFAULT = None
 
 
 class App :
+    """
+    Class which initialise every Streams.
+    Depending on the input it can be configure via a configuration file or via a configuration list
+    
+    """
 
-    def __init__(self,maxStream : int = 6, configFile :str = "" , streamSettingsList : list[str] = [] , configurationType : ConfigurationType = ConfigurationType.DEFAULT , debugLogging : bool = False):
+    def __init__(self,max_stream : int = 6, config_file :str = "" ,
+                 stream_settings_list : list[str] = None ,
+                 configuration_type : ConfigurationType = ConfigurationType.DEFAULT ,
+                 debug_logging : bool = False):
         
         self.preferences : Preferences = Preferences()
-        self.maxStream :int  = maxStream
-        self.streamSettingsList : list[str] = streamSettingsList
-        self.configFile :str = configFile
-        self.StreamList : list[Stream] = []
-        self.linkedData : list[queue.Queue] = []
-        self.debugLogging : bool = debugLogging 
-        self.configurationType : ConfigurationType = configurationType
+        self.max_stream :int  = max_stream
+        self.stream_settings_list : list[str] = stream_settings_list
+        self.config_file :str = config_file
+        self.stream_list : list[Stream] = []
+        self.linked_data : list[queue.Queue] = []
+        self.debug_logging : bool = debug_logging 
+        self.configuration_type : ConfigurationType = configuration_type
 
-        for i in range (self.maxStream) : 
-            self.linkedData.append(queue.Queue())
-            
-        for i in range(self.maxStream):
-            newPort = Stream(i ,self.linkedData , debugLogging=debugLogging )
-            self.StreamList.append(newPort)
-            
-        self.preferences = Preferences(self.maxStream)
-        
-        if configurationType != ConfigurationType.DEFAULT:
-            self.ConfigureApp( configurationType)
-        
+        for i in range (self.max_stream) :
+            self.linked_data.append(queue.Queue())
 
-        
+        for i in range(self.max_stream):
+            new_port = Stream(i ,self.linked_data , debug_logging=debug_logging )
+            self.stream_list.append(new_port)
 
-    def ConfigureApp(self , type : ConfigurationType ): 
-        
+        self.preferences = Preferences(self.max_stream)
+
+        if configuration_type != ConfigurationType.DEFAULT:
+            self.configure_app( configuration_type)
+
+    def configure_app(self , type : ConfigurationType ):
+        """ Configure app according to the configuration type selected
+        """
         if type.value == ConfigurationType.FILE.value :
-            
             config = configparser.ConfigParser()
-            readValue = config.read(self.configFile)
-            if len(readValue) != 0 :
+            read_value = config.read(self.config_file)
+            if len(read_value) != 0 :
                 try :
-                    newMaxStream = int(config.get("Preferences","numberOfPortPanels"))
-                    if self.maxStream > newMaxStream and newMaxStream > 0 : 
-                        diff = self.maxStream - newMaxStream
+                    new_max_stream = int(config.get("Preferences","numberOfPortPanels"))
+                    if self.max_stream > new_max_stream and new_max_stream > 0 :
+                        diff = self.max_stream - new_max_stream
                         for i in range(diff) : 
-                            self.StreamList.pop(self.maxStream - i - 1)
-                        self.maxStream = newMaxStream
-                except : 
-                    pass
+                            self.stream_list.pop(self.max_stream - i - 1)
+                        self.max_stream = new_max_stream
                 finally :
-                    nextStreamid = 0
+                    next_stream_id = 0
                     for key in config.sections():
                         if "Preferences" in key:
-                            FileConfiguration.ConfFilePreference(self.preferences, config[key] )
+                            FileConfiguration.conf_file_preference(self.preferences, config[key] )
                         if "Port" in key :
-                            FileConfiguration.ConfFileConfig(self.StreamList[nextStreamid],config[key])
-                            nextStreamid +=1 
-                    for portId in range(len(self.preferences.Connect)):
-                        self.StreamList[portId].setLineTermination(self.preferences.lineTermination)
-                        if self.preferences.Connect[portId] :
+                            FileConfiguration.conf_file_config(self.stream_list[next_stream_id],config[key])
+                            next_stream_id +=1
+                    for port_id, value  in enumerate(self.preferences.connect):
+                        self.stream_list[port_id].set_line_termination(self.preferences.line_termination)
+                        if value :
                             try :
-                                self.StreamList[portId].Connect(self.StreamList[portId].StreamType)
+                                self.stream_list[port_id].connect(self.stream_list[port_id].stream_type)
                             except: 
-                                print(f"Stream {portId} couldn't start properly")
+                                print(f"Stream {port_id} couldn't start properly")
             else :
                 raise Exception("Init Error","The given file is empty")
-        else : 
-            
+        else :
             iterator = 0
-            for stream in self.streamSettingsList :           
-                StreamType = stream.split("://")[0]
-                if StreamType.lower() in ["udp","udpspe","tcpcli","tcpsrv","serial","ntrip"]:
-                    try : 
-                        CommandLineConfiguration.CommandLineConfig(self.StreamList[iterator] , stream)
+            for stream in self.stream_settings_list :           
+                stream_type = stream.split("://")[0]
+                if stream_type.lower() in ["udp","udpspe","tcpcli","tcpsrv","serial","ntrip"]:
+                    try :
+                        CommandLineConfiguration.command_line_config(self.stream_list[iterator],stream)
                         iterator += 1
-                    except Exception as e : 
-                        print(f"Could not open {StreamType} : {e}")
-                        self.CloseAll()
+                    except Exception as e :
+                        print(f"Could not open {stream_type} : {e}")
+                        self.close_all()
                         break
                 else :
-                    raise ValueError(f" {StreamType} is not a valid stream type")
-    
+                    raise ValueError(f" {stream_type} is not a valid stream type")
 
 
-    def CloseAll(self):
+    def close_all(self):
         """
         Close every Stream that are still connected
         """
-        if self.configurationType.value == ConfigurationType.FILE.value or  self.configurationType.value == ConfigurationType.DEFAULT.value :
-            SaveConfiguration.createConfFile(self)
-        for port in self.StreamList:
-            port.Disconnect()
-        self.linkedData.clear()
-        self.StreamList.clear()
-        
-    
+        if ((self.configuration_type.value == ConfigurationType.FILE.value) or
+        (self.configuration_type.value == ConfigurationType.DEFAULT.value)) :
 
-
+            SaveConfiguration.create_conf_file(self)
+        for port in self.stream_list:
+            port.disconnect()
+        self.linked_data.clear()
+        self.stream_list.clear()

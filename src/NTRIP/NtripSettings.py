@@ -56,7 +56,7 @@ class NtripSettings:
     """
 
     def __init__(self , host : str = "" , port : int = 2101 ,auth : bool = False, username : str = "" , password : str = "",
-                 mountpoint : str = "" , tls : bool = False , fixedPos : bool = False , latitude : float = 00.00 , longitude : float = 0.000 , height : int = 0 , debugLogging : bool  = False) -> None:
+                 mountpoint : str = "" , tls : bool = False , fixed_pos : bool = False , latitude : float = 00.00 , longitude : float = 0.000 , height : int = 0 , debug_logging : bool  = False) -> None:
         """
         Initializes a new instance of the NTRIPSettings class.
         """
@@ -74,7 +74,7 @@ class NtripSettings:
         self.ntripVersion : int = 2
 
         # Fixed Position GGA
-        self.fixedPos : bool = fixedPos
+        self.fixed_pos : bool = fixed_pos
         self.latitude : float = latitude
         self.longitude : float = longitude
         self.height : int = height
@@ -82,15 +82,15 @@ class NtripSettings:
         self.sourceTable : list[NtripSourceTable] = []
         
         # Support Log
-        if debugLogging : 
-            self.logFile : logging.Logger = DEFAULTLOGFILELOGGER
+        if debug_logging : 
+            self.log_file : logging.Logger = DEFAULTLOGFILELOGGER
         else :
-            self.logFile = None
+            self.log_file = None
             
     def connect(self):    
             if len(self.host) == 0:
-                if self.logFile is not None : 
-                    self.logFile.error("Invalid Hostname : hostname empty")
+                if self.log_file is not None : 
+                    self.log_file.error("Invalid Hostname : hostname empty")
                 raise InvalidHostnameError()            
             if self.tls : 
                 ntripsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -105,12 +105,12 @@ class NtripSettings:
                     wrappedSocket.connect((self.host, self.port))
                     return wrappedSocket
                 except TimeoutError as e:
-                    if self.logFile is not None :
-                        self.logFile.error("Error during the handshake for TLS connection : %s" ,  e)
+                    if self.log_file is not None :
+                        self.log_file.error("Error during the handshake for TLS connection : %s" ,  e)
                     raise FailedHandshakeError()
                 except Exception as e :
-                    if self.logFile is not None : 
-                        self.logFile.error("Failed to open TLS socket : %s", e)
+                    if self.log_file is not None : 
+                        self.log_file.error("Failed to open TLS socket : %s", e)
                     raise e 
             else : 
                 try:
@@ -118,28 +118,28 @@ class NtripSettings:
                     ntripsocket.connect((self.host, self.port))
                     return ntripsocket
                 except Exception as e:
-                    if self.logFile is not None :
-                        self.logFile.error("Failed to open socket : %s", e )
+                    if self.log_file is not None :
+                        self.log_file.error("Failed to open socket : %s", e )
                     raise ConnectFailedError()
 
 
-    def setHost(self, NewHost : str):
+    def set_host(self, new_host : str):
         """
         Sets the host IP address.
         
         Args:
-            NewHost (str): The new host IP address.
+            new_host (str): The new host IP address.
         """
-        self.host = NewHost
+        self.host = new_host
 
-    def setPort(self, NewPort : int):
+    def set_port(self, new_port : int):
         """
         Sets the port number.
         
         Args:
-            NewPort (int): The new port number.
+            new_port (int): The new port number.
         """
-        self.port = NewPort
+        self.port = new_port
 
     def setMountpoint(self, NewMountpoint : str):
         """
@@ -184,7 +184,7 @@ class NtripSettings:
         Args:
             NewFixedPos (bool): The new fixed position.
         """
-        self.fixedPos = NewFixedPos
+        self.fixed_pos = NewFixedPos
 
     def setLatitude(self, NewLatitude : str):
         """
@@ -250,7 +250,7 @@ class NtripSettings:
             NewHeight (int): The new height.
         """
         self.height = NewHeight
-    def toString(self) ->str :
+    def to_string(self) ->str :
         return f"Host : {self.host} \n Port : {self.port} \n Username : {self.username} \n Password : {self.password} \n Mountpoint : {self.mountpoint} \n"
     
     

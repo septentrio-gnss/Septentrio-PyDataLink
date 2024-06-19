@@ -1,107 +1,108 @@
+
 import base64
+import os
 import configparser
+from src import constants
 from ..StreamConfig.Preferences import Preferences
 from ..StreamConfig.Stream import Stream
-from src import constants
-import os
 
-def createConfFile(app):
+
+def create_conf_file(app):
     """
     Create the default configuration file with the current values 
     """
-    confFileName = constants.CONFIGPATH + "/temp"
-    confFile = open(confFileName, "w")
+    conf_file_name = constants.CONFIGPATH + "/temp"
+    conf_file = open(conf_file_name, "w",encoding='utf-8')
 
     # Add content to the file
-    Config = configparser.ConfigParser()
-    for stream  in app.StreamList : 
-        sectionName = "Port"+str(stream.id)
-        Config.add_section(sectionName)
-        Config.set(sectionName,"linksChecked" , str(stream.linkedPort))
-        Config.set(sectionName,"startupScript" ,str(stream.sendStartupScript ))
-        Config.set(sectionName,"startupScriptFile" , stream.startupScript)
-        Config.set(sectionName,"closeScript",str(stream.sendCloseScript))
-        Config.set(sectionName,"closeScriptFile",stream.closeScript)
-        Config.set(sectionName,"logFile",stream.loggingFile)
-        SaveTCPConfig(stream ,sectionName , Config)
-        SaveUDPConfig(stream ,sectionName,Config)
-        Config.set(sectionName,"connectionType",str(stream.StreamType.value))
-        SaveSerialConfig(stream ,sectionName , Config)
-        SaveNTRIPConfig(stream , sectionName , Config)
-    
-    Config.add_section("Preferences")
-    SavePreferencesConfig(app.preferences, "Preferences" , Config)
-    Config.write(confFile)
-    confFile.close()
-    if os.path.exists(constants.DEFAULTCONFIGFILE) : 
+    config = configparser.ConfigParser()
+    for stream  in app.stream_list :
+        section_name = "Port"+str(stream.id)
+        config.add_section(section_name)
+        config.set(section_name,"linksChecked" , str(stream.linked_ports))
+        config.set(section_name,"startup_script" ,str(stream.send_startup_script ))
+        config.set(section_name,"startupScriptFile" , stream.startup_script)
+        config.set(section_name,"close_script",str(stream.send_close_script))
+        config.set(section_name,"closeScriptFile",stream.close_script)
+        config.set(section_name,"logfile",str(stream.logging_file))
+        save_tcp_config(stream ,section_name , config)
+        save_udp_config(stream ,section_name,config)
+        config.set(section_name,"connectionType",str(stream.stream_type.value))
+        save_serial_config(stream ,section_name , config)
+        save_ntrip_config(stream , section_name , config)
+
+    config.add_section("Preferences")
+    save_preferences_config(app.preferences, "Preferences" , config)
+    config.write(conf_file)
+    conf_file.close()
+    if os.path.exists(constants.DEFAULTCONFIGFILE) :
         os.remove(constants.DEFAULTCONFIGFILE)
-    os.rename(confFileName , constants.DEFAULTCONFIGFILE)    
-    
-    
-# Saving Config File
-def SaveUDPConfig(stream : Stream , sectionName : str,SaveConfigFile  : configparser.ConfigParser):
-    """
-        Add current class values in the configFile
-    Args:
-        sectionName (str): name of the current section
-        SaveConfigFile (configparser.ConfigParser): configparser of the configuration file
-    """
-    SaveConfigFile.set(sectionName,"hostNameUDP", stream.udpSettings.host )
-    SaveConfigFile.set(sectionName,"portNumberUDP",str(stream.udpSettings.port))
-    SaveConfigFile.set(sectionName,"specificIpUDP",str(stream.udpSettings.specificHost))
-    SaveConfigFile.set(sectionName,"dataDirUDP",str(stream.udpSettings.DataFlow.value))
+    os.rename(conf_file_name , constants.DEFAULTCONFIGFILE)
 
-def SaveTCPConfig(stream : Stream , sectionName : str,SaveConfigFile  : configparser.ConfigParser):
+# Saving config File
+def save_udp_config(stream : Stream,section_name : str,save_config_file:configparser.ConfigParser):
     """
-        Add current class values in the configFile
+        Add current class values in the config_file
     Args:
-        sectionName (str): name of the current section
-        SaveConfigFile (configparser.ConfigParser): configparser of the configuration file
+        section_name (str): name of the current section
+        save_config_file (configparser.ConfigParser): configparser of the configuration file
     """
-    SaveConfigFile.set(sectionName,"hostName",stream.tcpSettings.host)
-    SaveConfigFile.set(sectionName,"portNumber",str(stream.tcpSettings.port))
-    SaveConfigFile.set(sectionName,"TCPserver",str(stream.tcpSettings.isServer()))
+    save_config_file.set(section_name,"hostNameUDP", stream.udp_settings.host )
+    save_config_file.set(section_name,"portNumberUDP",str(stream.udp_settings.port))
+    save_config_file.set(section_name,"specificIpUDP",str(stream.udp_settings.specific_host))
+    save_config_file.set(section_name,"dataDirUDP",str(stream.udp_settings.DataFlow.value))
 
-def SaveSerialConfig(stream : Stream , sectionName : str,SaveConfigFile  : configparser.ConfigParser):
+def save_tcp_config(stream : Stream,section_name : str,save_config_file:configparser.ConfigParser):
     """
-        Add current class values in the configFile
+        Add current class values in the config_file
     Args:
-        sectionName (str): name of the current section
-        SaveConfigFile (configparser.ConfigParser): configparser of the configuration file
+        section_name (str): name of the current section
+        save_config_file (configparser.ConfigParser): configparser of the configuration file
     """
+    save_config_file.set(section_name,"hostName",stream.tcp_settings.host)
+    save_config_file.set(section_name,"portNumber",str(stream.tcp_settings.port))
+    save_config_file.set(section_name,"TCPserver",str(stream.tcp_settings.is_server()))
+
+def save_serial_config(stream:Stream,section_name : str,save_config_file:configparser.ConfigParser):
+    """
+        Add current class values in the config_file
+    Args:
+        section_name (str): name of the current section
+        save_config_file (configparser.ConfigParser): configparser of the configuration file
+    """
+
+    save_config_file.set(section_name,"Serial.Port", str(stream.serial_settings.port))
+    save_config_file.set(section_name,"Serial.BaudRate",str(stream.serial_settings.baudrate.value))
+    save_config_file.set(section_name,"Serial.Parity",str(stream.serial_settings.parity.value))
+    save_config_file.set(section_name,"Serial.StopBits",str(stream.serial_settings.stopbits.value))
+    save_config_file.set(section_name,"Serial.ByteSize",str(stream.serial_settings.bytesize.value))
+    save_config_file.set(section_name,"Serial.RtcCts",str(stream.serial_settings.rtscts))
     
-    SaveConfigFile.set(sectionName,"Serial.Port", str(stream.serialSettings.port))
-    SaveConfigFile.set(sectionName,"Serial.BaudRate",str(stream.serialSettings.baudrate.value))
-    SaveConfigFile.set(sectionName,"Serial.Parity",str(stream.serialSettings.parity.value))
-    SaveConfigFile.set(sectionName,"Serial.StopBits",str(stream.serialSettings.stopbits.value))
-    SaveConfigFile.set(sectionName,"Serial.ByteSize",str(stream.serialSettings.bytesize.value))
-    SaveConfigFile.set(sectionName,"Serial.RtcCts",str(stream.serialSettings.rtscts))
-    
-def SaveNTRIPConfig(stream : Stream , sectionName : str,SaveConfigFile  : configparser.ConfigParser):
-    SaveConfigFile.set(sectionName,"NTRIP.hostname",str(stream.ntripClient.ntripSettings.host))
-    SaveConfigFile.set(sectionName,"NTRIP.portnumber",str(stream.ntripClient.ntripSettings.port))
-    SaveConfigFile.set(sectionName,"NTRIP.mountPoint",str(stream.ntripClient.ntripSettings.mountpoint))
-    SaveConfigFile.set(sectionName,"NTRIP.authenticationenabled", str(stream.ntripClient.ntripSettings.auth))
-    SaveConfigFile.set(sectionName,"NTRIP.user",str(stream.ntripClient.ntripSettings.username))
-    SaveConfigFile.set(sectionName,"NTRIP.password",str(base64.b64encode((stream.ntripClient.ntripSettings.password).encode()).decode()))
-    SaveConfigFile.set(sectionName,"NTRIP.fixedpositionset",str(stream.ntripClient.ntripSettings.fixedPos))
-    SaveConfigFile.set(sectionName,"NTRIP.fixedLatitude",str(stream.ntripClient.ntripSettings.latitude))
-    SaveConfigFile.set(sectionName,"NTRIP.fixedLongitude",str(stream.ntripClient.ntripSettings.longitude))
-    SaveConfigFile.set(sectionName,"NTRIP.fixedHeight",str(stream.ntripClient.ntripSettings.height))
-    SaveConfigFile.set(sectionName,"NTRIP.TLS", str(stream.ntripClient.ntripSettings.tls))
+def save_ntrip_config(stream : Stream,section_name:str,save_config_file:configparser.ConfigParser):
+    save_config_file.set(section_name,"NTRIP.hostname",str(stream.ntrip_client.ntrip_settings.host))
+    save_config_file.set(section_name,"NTRIP.portnumber",str(stream.ntrip_client.ntrip_settings.port))
+    save_config_file.set(section_name,"NTRIP.mountPoint",str(stream.ntrip_client.ntrip_settings.mountpoint))
+    save_config_file.set(section_name,"NTRIP.authenticationenabled", str(stream.ntrip_client.ntrip_settings.auth))
+    save_config_file.set(section_name,"NTRIP.user",str(stream.ntrip_client.ntrip_settings.username))
+    save_config_file.set(section_name,"NTRIP.password",str(base64.b64encode((stream.ntrip_client.ntrip_settings.password).encode()).decode()))
+    save_config_file.set(section_name,"NTRIP.fixedpositionset",str(stream.ntrip_client.ntrip_settings.fixed_pos))
+    save_config_file.set(section_name,"NTRIP.fixedLatitude",str(stream.ntrip_client.ntrip_settings.latitude))
+    save_config_file.set(section_name,"NTRIP.fixedLongitude",str(stream.ntrip_client.ntrip_settings.longitude))
+    save_config_file.set(section_name,"NTRIP.fixedHeight",str(stream.ntrip_client.ntrip_settings.height))
+    save_config_file.set(section_name,"NTRIP.TLS", str(stream.ntrip_client.ntrip_settings.tls))
     
     
 
-def SavePreferencesConfig(preferences : Preferences , sectionName : str,SaveConfigFile  : configparser.ConfigParser): 
+def save_preferences_config(preferences : Preferences , section_name : str,save_config_file  : configparser.ConfigParser): 
     """
-        Add current class values in the configFile
+        Add current class values in the config_file
     Args:
-        sectionName (str): name of the current section
-        SaveConfigFile (configparser.ConfigParser): configparser of the configuration file
+        section_name (str): name of the current section
+        save_config_file (configparser.ConfigParser): configparser of the configuration file
     """
-    SaveConfigFile.set(sectionName , "configName" ,str(preferences.configName))       
-    SaveConfigFile.set(sectionName,"numberOfPortPanels",str(preferences.maxStreams))
-    SaveConfigFile.set(sectionName,"lineTermination",preferences.lineTermination.replace("\n","\\n").replace("\r","\\r"))
-    for connect , index in zip(preferences.Connect,range(len(preferences.Connect))):
-        connectString = "connect" + str(index)
-        SaveConfigFile.set(sectionName,connectString,str(connect))
+    save_config_file.set(section_name , "config_name" ,str(preferences.config_name))
+    save_config_file.set(section_name,"numberOfPortPanels",str(preferences.max_streams))
+    save_config_file.set(section_name,"line_termination",preferences.line_termination.replace("\n","\\n").replace("\r","\\r"))
+    for connect , index in zip(preferences.connect,range(len(preferences.connect))):
+        connect_string = "connect" + str(index)
+        save_config_file.set(section_name,connect_string,str(connect))
