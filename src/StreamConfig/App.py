@@ -103,8 +103,8 @@ class App :
                         if value :
                             try :
                                 self.stream_list[port_id].connect(self.stream_list[port_id].stream_type)
-                            except: 
-                                print(f"Stream {port_id} couldn't start properly")
+                            except Exception as e:
+                                print(f"Stream {port_id} couldn't start properly , {e}")
             else :
                 raise Exception("Init Error","The given file is empty")
         else :

@@ -6,8 +6,8 @@ from ..StreamSettings import SerialSettings ,TcpSettings , UdpSettings
 from ..constants import *
 import copy
 import PySide6.QtAsyncio as QtAsyncio
-from PySide6.QtCore import QSize, Qt , QRegularExpression , QUrl, QThread , Signal
-from PySide6.QtGui import  QRegularExpressionValidator,QTextCursor,QAction,QIcon,QDesktopServices,QPixmap
+from PySide6.QtCore import QSize, Qt , QRegularExpression , QUrl, QThread , Signal , Slot , QThreadPool
+from PySide6.QtGui import  QRegularExpressionValidator,QTextCursor,QAction,QIcon,QDesktopServices,QPixmap , QColor
 from PySide6.QtWidgets import (QMainWindow, QApplication, QCheckBox, QComboBox,
                                QCommandLinkButton, QDateTimeEdit, QDial,
                                QDialog, QDialogButtonBox, QFileSystemModel,
@@ -55,7 +55,7 @@ class GraphicalUserInterface(QMainWindow):
         self.setWindowTitle(APPNAME)
 
         # Menu bar
-        menu_bar = self.menu_bar()
+        menu_bar = self.menuBar()
 
         # Create a menu
         file_menu = menu_bar.addMenu('File')
@@ -68,7 +68,7 @@ class GraphicalUserInterface(QMainWindow):
         # exit action
         exit_Action = QAction('Exit', self)
         exit_Action.setShortcut('Ctrl+Q')
-        exit_Action.triggered.connect(self.close)
+        exit_Action.triggered.connect(lambda : self.close())
 
         file_menu.addAction(preference_action)
         file_menu.addSeparator()
@@ -82,7 +82,7 @@ class GraphicalUserInterface(QMainWindow):
 
         # github page
         github_page_action = QAction(QIcon(os.path.join(DATAFILESPATH ,"Github_icon.png")),"GitHub Repository", self)
-        github_page_action.triggered.connect(self.open_link())
+        github_page_action.triggered.connect(lambda : self.open_link())
 
         # About action
         about_action = QAction(QIcon(os.path.join(DATAFILESPATH , 'pyDatalink_icon.png')),"About",self)
@@ -188,8 +188,7 @@ class ConnectionCard :
         #showdata
         self.show_data_button = QPushButton("Show Data")
 
-        self.show_data_dialog = ShowDataInterface(self.stream)
-        self.show_data_dialog.finished.connect(lambda : self.show_data_button.setText("Show Data"))
+       
 
         # Final Layout
         card_layout = QVBoxLayout(result)
@@ -208,8 +207,8 @@ class ConnectionCard :
         # SIGNALS
 
         self.configure_button.pressed.connect(lambda : self.open_configure_interface(self.stream))
-        self.connect_button.pressed.connect(self.connect_stream())
-        self.show_data_button.pressed.connect(self.show_data())
+        self.connect_button.pressed.connect(self.connect_stream)
+        self.show_data_button.pressed.connect(self.show_data)
         return result
 
     def link_layout(self):
@@ -237,7 +236,7 @@ class ConnectionCard :
         """Open configuration dialog to configure current stream
         """
         configure_dialog = ConfigureInterface(stream)
-        configure_dialog.accepted.connect(self.refresh_cards())
+        configure_dialog.accepted.connect(self.refresh_cards)
         configure_dialog.exec_()
 
     def refresh_cards(self):
@@ -285,6 +284,8 @@ class ConnectionCard :
             self.show_data_button.setText("Show Data")
             self.show_data_dialog.close_dialog()
         else:
+            self.show_data_dialog = ShowDataInterface(self.stream)
+            self.show_data_dialog.finished.connect(lambda : self.show_data_button.setText("Show Data"))
             self.show_data_button.setText("Hide Data")
             self.show_data_dialog.show()
 
@@ -306,7 +307,7 @@ class ConfigureInterface(QDialog) :
         self.setFixedSize(350,580)
         configure_layout = QVBoxLayout(self)
         self.previous_tab = previous_tab
-
+        
         serial_menu = self.serial_menu()
         tcp_menu = self.tcp_menu()
         udp_menu =  self.udp_menu()
@@ -486,7 +487,7 @@ class ConfigureInterface(QDialog) :
         connection_mode_box = QGroupBox("Connection Mode")
         client_mode = QRadioButton("TCP/IP Client")
         server_mode = QRadioButton("TCP/IP Server")
-        if self.stream.tcp_settings.StreamMode == StreamMode.CLIENT:
+        if self.stream.tcp_settings.stream_mode == StreamMode.CLIENT:
             client_mode.setChecked(True)
         else:
             server_mode.setChecked(True)
@@ -530,7 +531,7 @@ class ConfigureInterface(QDialog) :
         client_mode.clicked.connect(lambda : self.stream.tcp_settings.set_stream_mode(StreamMode.CLIENT))
         server_mode.clicked.connect(lambda : self.stream.tcp_settings.set_stream_mode(StreamMode.SERVER))
         host_name.editingFinished.connect(lambda : self.stream.tcp_settings.set_host(host_name.text()))
-        port.editingFinished.connect(lambda : self.stream.tcp_settings.set_port(Port.value()))
+        port.editingFinished.connect(lambda : self.stream.tcp_settings.set_port(port.value()))
 
         return result
 
@@ -713,8 +714,8 @@ class ConfigureInterface(QDialog) :
         result_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         #   SIGNALS
-        self.ntrip_host_name.editingFinished.connect(self.update_mountpoint_list())
-        self.ntrip_host_name.editingFinished.emit()
+        self.ntrip_host_name.editingFinished.connect(lambda: self.update_mountpoint_list())
+        # self.ntrip_host_name.editingFinished.emit()
 
         port.valueChanged.connect(lambda : self.stream.ntrip_client.ntrip_settings.set_port(port.value()))
 
@@ -727,7 +728,7 @@ class ConfigureInterface(QDialog) :
         latitude.editingFinished.connect(lambda : self.stream.ntrip_client.ntrip_settings.setLatitude(latitude.text()))
         longitude.editingFinished.connect(lambda : self.stream.ntrip_client.ntrip_settings.setLongitude(longitude.text()))
         height.valueChanged.connect(lambda x : self.stream.ntrip_client.ntrip_settings.setHeight(height.value()))
-        cert_select_file.pressed.connect(self.select_cert_file() )
+        cert_select_file.pressed.connect(self.select_cert_file )
         self.cert.editingFinished.connect(lambda : self.stream.ntrip_client.ntrip_settings.setCert(self.cert.text()))
         tls_box.toggled.connect(lambda : self.stream.ntrip_client.ntrip_settings.setTls(tls_box.isChecked()))
         return result
@@ -738,8 +739,8 @@ class ConfigureInterface(QDialog) :
         self.mountpoint_list.clear()
         self.mountpoint_list.setPlaceholderText("Waiting for source table ...")
         update_thread = ConfigurationThread(self)
-        update_thread.finished.connect(self.task_get_new_source_table)
-        update_thread.finished.connect(update_thread.deleteLater)
+        # update_thread.finished.connect(lambda : self.task_get_new_source_table())
+        # update_thread.finished.connect(update_thread.deleteLater)
         update_thread.start()
 
     def task_get_new_source_table(self):
@@ -854,13 +855,14 @@ class ShowDataInterface(QDialog):
     def __init__(self,stream : Stream) -> None:
         super().__init__()
         self.stream = stream
+        self.timer_id = self.startTimer(10)
         self.setMinimumSize(350,300)
         self.setBaseSize(350,300)
         self.setWindowIcon(QIcon(os.path.join(DATAFILESPATH , 'pyDatalink_icon.png')))
         self.setWindowTitle("Data Link Connection " + str(stream.id))
         configure_layout = QVBoxLayout(self)
         self.show_data_output = QTextEdit()
-        self.show_data_output.setLineWrapColumnOrWidth(1000) 
+        self.show_data_output.setLineWrapColumnOrWidth(1000)
         self.show_data_output.setLineWrapMode(QTextEdit.LineWrapMode.FixedPixelWidth)
         self.show_data_output.setReadOnly(True)
         self.freeze = False
@@ -881,7 +883,7 @@ class ShowDataInterface(QDialog):
         configure_layout.addWidget(show_data)
         configure_layout.addLayout(self.bottom_button())
 
-        self.timer_id = self.startTimer(10)
+        
 
     def timeEvent(self, event):
         if self.stream.data_to_show.empty() is False :
@@ -898,23 +900,23 @@ class ShowDataInterface(QDialog):
         #Valid Button : confirm all modification
 
         clear_button = QPushButton("Clear")
-        clear_button.pressed.connect(self.show_data_output.clear())
+        clear_button.pressed.connect(self.show_data_output.clear)
         clear_button.setDefault(False)
         clear_button.setAutoDefault(False)
-        freeze_button = QPushButton("Freeze")
-        freeze_button.setDefault(False)
-        freeze_button.setAutoDefault(False)
-        freeze_button.pressed.connect(self.freeze_data_flow())
+        self.freeze_button = QPushButton("Freeze")
+        self.freeze_button.setDefault(False)
+        self.freeze_button.setAutoDefault(False)
+        self.freeze_button.pressed.connect(self.freeze_data_flow)
         valid_button = QPushButton("Close")
         valid_button.setDefault(False)
         valid_button.setAutoDefault(False)
-        valid_button.pressed.connect(self.close_dialog())
+        valid_button.pressed.connect(self.close_dialog)
 
         #return : close the dialog with no modification
 
         bottom_button_layout = QHBoxLayout()
         bottom_button_layout.addWidget(clear_button)
-        bottom_button_layout.addWidget(freeze_button)
+        bottom_button_layout.addWidget(self.freeze_button)
         bottom_button_layout.addWidget(valid_button)
 
         return bottom_button_layout
@@ -1023,17 +1025,33 @@ class PreferencesInterface(QDialog):
         startup_connect_label = QLabel("Select the ports that should auto connect at startup")
         startup_connect_layout.addWidget(startup_connect_label)
         startup_connect_layout.addLayout(self.startup_connect_layout())
+        
 
         # Final Layout
 
         preference_layout.addWidget(general_box)
         preference_layout.addWidget(startup_connect_box)
+        preference_layout.addLayout(self.bottom_button_layout())
 
         #SIGNALS
         # self.preference.set_max_stream(newvalue)
         max_streams_input.valueChanged.connect(lambda  : self.preference.set_max_stream(max_streams_input.value()))
         line_termination_combobox.currentIndexChanged.connect(lambda : self.preference.set_line_termination(line_termination_combobox.currentData()))
         config_name_input.editingFinished.connect(lambda : self.preference.set_config_name(config_name_input.text()))
+        
+    def bottom_button_layout(self):
+        """Create the ok and cancel button of the dialog
+        """
+
+        #Valid Button : confirm all modification
+        valid_button = QPushButton("OK")
+        valid_button.pressed.connect(self.accept)
+
+
+        bottom_button_layout = QHBoxLayout()
+        bottom_button_layout.addWidget(valid_button)
+
+        return bottom_button_layout
 
     def startup_connect_layout(self):
         """
@@ -1089,12 +1107,12 @@ class AboutDialog(QDialog):
         message = QLabel("Version : 1.0.0")
         content_layout.addWidget(html_label)
         content_layout.addWidget(message)
-        
+
         self.dialoglayout.addLayout(content_layout)
         self.dialoglayout.addWidget(self.button_box)
         self.dialoglayout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.setLayout(self.dialoglayout)
-              
+
 class ConfigurationThread(QThread):
     """custom thread for qt threading
     """
@@ -1103,11 +1121,22 @@ class ConfigurationThread(QThread):
     def __init__(self, configure_interface : ConfigureInterface):
         super().__init__()
         self.configure_interface = configure_interface
+        self.finished.connect(self.handle_signal)
+
+    def emit_signal(self):
+        # Emit the signal using the instance
+        self.finished.emit()
+
+    def handle_signal(self):
+        print("Signal received and handled")
+        
+    @Slot()
     def run(self):
         """run thread function
         """
         try :
             self.configure_interface.stream.ntrip_client.set_settings_host(self.configure_interface.ntrip_host_name.text())
-        except :
-             self.configure_interface.stream.ntrip_client.ntrip_settings.sourceTable = None
+        except Exception as e :
+            print(e)
+            self.configure_interface.stream.ntrip_client.ntrip_settings.sourceTable = None
         self.finished.emit()
