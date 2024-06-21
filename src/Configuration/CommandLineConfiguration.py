@@ -96,7 +96,7 @@ def command_line_config(stream : Stream, command_line : str):
         for i in port_to_link:
             try :
                 link = int(i)
-                if link != stream.id:
+                if link != stream.stream_id:
                     stream.linked_ports.append(link)
             except (TypeError, ValueError) as e :
                 raise PortLinkedException(e) from e

@@ -29,28 +29,29 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
-from src.constants import  * 
+import os
+import argparse
+from src.constants import  DATAPATH , CONFIGPATH , LOGFILESPATH , DEFAULTCONFIGFILE
 from src.StreamConfig.App import App , ConfigurationType
-try : 
+try :
     from PySide6.QtWidgets import QApplication
-    from src.UserInterfaces import GraphicalUserInterface 
+    from src.UserInterfaces.GraphicalUserInterface import GraphicalUserInterface 
     GUI = True
 except Exception as e:
-    print(e)
     GUI = False
-import os
-import shutil
-import argparse
-try : 
-    from src.UserInterfaces import TerminalUserInterface
+    raise e
+
+try :
+    from src.UserInterfaces.TerminalUserInterface import TerminalUserInterface
     TUI = True
-except : 
+except NotImplementedError :
     TUI = False
-from src.UserInterfaces import CommandLineInterface
+
+from src.UserInterfaces.CommandLineInterface import CommandLineInterface
 
 
-    
-def checkDataFolder():
+
+def check_data_folder():
     if os.path.exists(DATAPATH) is not True :
         os.mkdir(DATAPATH)
     if os.path.exists( CONFIGPATH ) is not True:
@@ -59,77 +60,78 @@ def checkDataFolder():
         os.mkdir(LOGFILESPATH )
 
 class DatalinkApp:
-    
+    """Main class for Datalink application
+    """
 
-    def __init__(self) -> None:
+    def __init__(self , config_args) -> None:
+        self.config_args = config_args
         self.app : App = None
-        self.userInterface = None
-        self.showDataPort = None
-        if args.Mode == "CMD" :
-                if args.Streams is None :
-                    print("Error : you need to specify the streams to configure\n")
-                    return
-                else :
-                    if args.ShowData is not None:
-                        try :
-                            show = int(args.ShowData)
-                        except Exception as e :
-                                print(f"Error : streams id \"{args.ShowData}\" is not correct , please enter a valid ID !")
-                                return 
-                    
-                    self.app = App(max_stream=len(args.Streams),stream_settings_list=args.Streams , configuration_type= ConfigurationType.CMDLINE)
-                    if args.ShowData is not None :
-                        if show <= len(self.app.stream_list):
-                            self.showDataPort=self.app.stream_list[show - 1]
-                            self.showDataPort.toggle_all_data_visibility()
-                    
-        else : 
-                if os.path.exists(args.ConfigPath): 
-                    self.app = App(configuration_type= ConfigurationType.FILE,config_file=args.ConfigPath, debug_logging=True)
-                elif os.path.exists(DEFAULTCONFIGFILE) : 
-                    self.app = App(configuration_type= ConfigurationType.FILE , config_file=DEFAULTCONFIGFILE , debug_logging=True)
-                else :
-                    self.app = App(debug_logging=True)
-        self.Start()
-                
-    def Start(self) -> None : 
-        if args.Mode == "TUI":
-            self.DatalinkInTerminalStart()
-        elif args.Mode == "GUI":
-            self.DatalinkInGuiStart()
-        elif args.Mode == "CMD":
-            self.DatalinkInCmdStart()
-                        
+        self.user_interface = None
+        self.show_data_port = None
+        if self.config_args.Mode == "CMD" :
+            if self.config_args.Streams is None :
+                print("Error : you need to specify the streams to configure\n")
+                return
+            else :
+                if self.config_args.ShowData is not None:
+                    try :
+                        show = int(self.config_args.ShowData)
+                    except ValueError  as exc:
+                        print(f"Error : streams stream_id \"{self.config_args.ShowData}\" is not correct , please enter a valid ID !")
+                        raise exc
 
-    def DatalinkInTerminalStart(self):
+                self.app = App(max_stream=len(self.config_args.Streams),stream_settings_list=self.config_args.Streams , configuration_type= ConfigurationType.CMDLINE)
+                if self.config_args.ShowData is not None :
+                    if show <= len(self.app.stream_list):
+                        self.show_data_port=self.app.stream_list[show - 1]
+                        self.show_data_port.toggle_all_data_visibility()
+
+        else :
+            if os.path.exists(self.config_args.ConfigPath):
+                self.app = App(configuration_type= ConfigurationType.FILE,config_file=self.config_args.ConfigPath, debug_logging=True)
+            elif os.path.exists(DEFAULTCONFIGFILE) :
+                self.app = App(configuration_type= ConfigurationType.FILE , config_file=DEFAULTCONFIGFILE , debug_logging=True)
+            else :
+                self.app = App(debug_logging=True)
+
+    def start(self) -> None :
+        if self.config_args.Mode == "TUI":
+            self.datalink__terminal_start()
+        elif self.config_args.Mode == "GUI":
+            self.datalink_graphical_start()
+        elif self.config_args.Mode == "CMD":
+            self.datalink_cmdline_start()
+
+    def datalink__terminal_start(self):
+        """Start Datalink as a Graphical User interface
+        """
         if os.name == "posix" and TUI:
-                self.userInterface = TerminalUserInterface(self.app)
-                sys.exit(self.userInterface.MainMenu())
-            
+            self.user_interface = TerminalUserInterface(self.app)
+            sys.exit(self.user_interface.MainMenu())
         elif not TUI:
-            print(f"simple-Term-menu is required to run in TUI mode \nInstall Simple-Term-Menu : pip install simple-term-menu\nOr run the App in a Different mode (-m GUI or -m CMD)")
+            print("simple-Term-menu is required to run in TUI mode \nInstall Simple-Term-Menu : pip install simple-term-menu\nOr run the App in a Different mode (-m GUI or -m CMD)")
         else :
-                print(f"Sorry the terminal version of Data link is only available on Unix distro")
-    
-    def DatalinkInGuiStart(self):
+            print("Sorry the terminal version of Data link is only available on Unix distro")
+
+    def datalink_graphical_start(self):
+        """Start Datalink as a Graphical User interface
+        """
         if(GUI):
-            self.userInterface = QApplication()
-            gallery = GraphicalUserInterface.GraphicalUserInterface(self.app)
+            self.user_interface = QApplication()
+            gallery = GraphicalUserInterface(self.app)
             gallery.show()
-            sys.exit(self.userInterface.exec())
+            sys.exit(self.user_interface.exec())
         else :
-            print(f"PySide6 is required to run in GUI mode \nInstall pyside : pip install PySide6 \nOr run the App in a Different mode (-m CMD or -m TUI)")
-        
-    def DatalinkInCmdStart(self):
-        self.userInterface = CommandLineInterface.CommandLineInterface(self.app , showdataId = self.showDataPort)
-        sys.exit(self.userInterface.run())
-    
-        
+            print("PySide6 is required to run in GUI mode \nInstall pyside : pip install PySide6 \nOr run the App in a Different mode (-m CMD or -m TUI)")
+
+    def datalink_cmdline_start(self):
+        """Start Datalink as a command line interface
+        """
+        self.user_interface = CommandLineInterface(self.app , show_data_id= self.show_data_port)
+        sys.exit(self.user_interface.run())
 
 if __name__ == "__main__":
-    checkDataFolder()
-    MinPorts = 1
-    MaxPorts = 6
+    check_data_folder()
 
     parser = argparse.ArgumentParser(prog="PyDatalink" ,description='')
     parser.add_argument('--Mode','-m', choices=['TUI', 'GUI', 'CMD'], default='GUI',
@@ -137,15 +139,10 @@ if __name__ == "__main__":
     parser.add_argument('--ConfigPath','-c', action='store', default= DEFAULTCONFIGFILE ,
                             help='Path to the config file ( This Option won\'t be use when in CMD mode )  ')
 
-    parser.add_argument('--Streams' ,'-s', nargs='*' , action='store' , 
+    parser.add_argument('--Streams' ,'-s', nargs='*' , action='store' ,
                         help="List of streams to configure , the size of this list is configure by --nbPorts\n ,this parameter is only used when in CMD mode \n ")
     parser.add_argument('--ShowData', "-d" ,nargs="?", action="store",
-                        help="Lisf of streams id, will print every input and output data from the streams\n ,this parameter is only used when in CMD mode ")
-    
+                        help="Lisf of streams stream_id, will print every input and output data from the streams\n ,this parameter is only used when in CMD mode ")
 
-    args = parser.parse_args()
-    DatalinkApp()
-        
+    DatalinkApp(config_args=parser.parse_args()).start()
 
-
-   

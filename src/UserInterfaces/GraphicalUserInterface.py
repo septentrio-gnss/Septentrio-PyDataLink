@@ -1,3 +1,31 @@
+# ###############################################################################
+# 
+# Copyright (c) 2024, Septentrio
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its
+#    contributors may be used to endorse or promote products derived from
+#    this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import math
 import copy
@@ -6,15 +34,15 @@ from ..StreamConfig.App import *
 from ..StreamSettings import SerialSettings ,TcpSettings , UdpSettings
 from ..constants import *
 
-from PySide6.QtCore import QObject, Qt , QRegularExpression , QUrl, QThread , Signal
-from PySide6.QtGui import  QRegularExpressionValidator,QTextCursor,QAction,QIcon,QDesktopServices
+from PySide6.QtCore import QObject, Qt , QRegularExpression , QUrl, QThread , Signal 
+from PySide6.QtGui import  QRegularExpressionValidator,QTextCursor,QAction,QIcon,QDesktopServices , QPixmap
 from PySide6.QtWidgets import (QMainWindow, QApplication, QCheckBox, QComboBox, QFrame,
                                QDialog, QDialogButtonBox,QGridLayout, QGroupBox, QHBoxLayout, QLabel,
                                QLineEdit, QPushButton, QRadioButton, QMessageBox,
                                QSpinBox,QTabWidget, QTextEdit,QVBoxLayout, QWidget,QFileDialog)
 
 
-def pair_h_widgets( *widgets ) -> QHBoxLayout:
+def pair_h_widgets( *widgets : QWidget ) -> QHBoxLayout:
     """Add every widgets to a horizontal layout
     Returns:
         QHBoxLayout: _description_
@@ -24,7 +52,7 @@ def pair_h_widgets( *widgets ) -> QHBoxLayout:
         result.addWidget(widget)
     result.setAlignment(Qt.AlignmentFlag.AlignTop)
     return result
-def pair_v_widgets(*widgets) ->QVBoxLayout:
+def pair_v_widgets(*widgets : QWidget) ->QVBoxLayout:
     """Add every widgets to a horizontal layout
 
     Returns:
@@ -93,7 +121,7 @@ class GraphicalUserInterface(QMainWindow):
         connection_card_layout = QVBoxLayout()
         connection_card_line_layout = QHBoxLayout()
         number_card_per_line = math.ceil(self.app.max_stream / 2)
-        number_line = int(self.app.max_stream /number_card_per_line)
+        number_line = math.ceil(self.app.max_stream /number_card_per_line)
         for i in range(self.app.max_stream):
             new_card = ConnectionCard(i,self.app.stream_list[i],self.app.max_stream)
             self.streams_widget.append(new_card)
@@ -106,7 +134,6 @@ class GraphicalUserInterface(QMainWindow):
         if connection_card_line_layout.count() < number_card_per_line :
             connection_card_layout.addLayout(connection_card_line_layout)
 
-        print(number_line)
         window_height = (350 * number_line) + 50
         window_width = (300 * number_card_per_line) + 20
         self.setFixedSize(window_width,window_height)
@@ -150,9 +177,9 @@ class GraphicalUserInterface(QMainWindow):
 class ConnectionCard :
     """Widget of a stream in the main page
     """   
-    def __init__(self,id : int ,stream : Stream , max_streams : int ) -> None:
+    def __init__(self,stream_id : int ,stream : Stream , max_streams : int ) -> None:
         self.stream = stream
-        self.id = id
+        self.stream_id = stream_id
         self.max_streams = max_streams
         self.connection_card_widget = self.connection_card()
         self.connect_thread = None
@@ -162,19 +189,14 @@ class ConnectionCard :
     def connection_card(self):
         """create the card widget
         """
-        result = QGroupBox(f"Connection {self.id}")
+        result = QGroupBox(f"Connection {self.stream_id}")
 
         result.setFixedSize(300,350)
         #Top button
-        self.connect_button = QPushButton("connect")
+        self.connect_button = QPushButton("Connect")
 
         #Add slot : connect the selected stream
         self.configure_button = QPushButton("Configure")
-        #add slot : create a new window to configure stream
-
-        top_button_layout = QHBoxLayout()
-        top_button_layout.addWidget(self.connect_button)
-        top_button_layout.addWidget(self.configure_button)
 
        # overviewText
         self.current_config_overview = QLabel()
@@ -184,12 +206,12 @@ class ConnectionCard :
 
         # Status
         self.status= QLabel()
-        self.status.setAlignment(Qt.AlignHCenter)
-        self.status.setFixedSize(280,50)
+        self.status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status.setFixedSize(280,30)
 
         #Data Transfert
         self.current_data_transfert = QLabel()
-        self.current_data_transfert.setText(f"ingoing : {self.stream.data_transfer_input} kBps | outgoing : {self.stream.data_transfer_output} kBps")
+        self.current_data_transfert.setText(f"In: {self.stream.data_transfer_input} kBps | Out: {self.stream.data_transfer_output} kBps")
         self.current_data_transfert.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.current_data_transfert.setStyleSheet("QWidget { border: 2px solid grey; }")
         self.current_data_transfert.setFixedSize(160,24)
@@ -197,11 +219,16 @@ class ConnectionCard :
         #showdata
         
         self.show_data_button = QPushButton("Show Data")
-        bottom_layout = pair_h_widgets(self.show_data_button , self.current_data_transfert)
+        data_layout = pair_h_widgets(self.show_data_button , self.current_data_transfert)
+        button_layout = pair_h_widgets(self.connect_button , self.configure_button)
+        top_layout = QVBoxLayout()
+        top_layout.addLayout(button_layout)
+        top_layout.addLayout(data_layout)
+        top_layout.addWidget(self.status)
         
         #Separator
         separator : list[QFrame] = []
-        for _ in range(3) :
+        for _ in range(2) :
             new_separator = QFrame()
             new_separator.setFrameShape(QFrame.HLine)
             new_separator.setFrameShadow(QFrame.Sunken)
@@ -210,23 +237,25 @@ class ConnectionCard :
         
         # Final Layout
         card_layout = QVBoxLayout(result)
-        card_layout.addLayout(top_button_layout)
-        card_layout.addLayout(bottom_layout)
+        card_layout.addLayout(top_layout)
         card_layout.addWidget(separator[0])
         card_layout.addWidget(self.current_config_overview)
         card_layout.addWidget(separator[1])
         card_layout.addWidget(self.link_layout())
-        card_layout.addWidget(separator[2])
-        card_layout.addWidget(self.status)
 
         #Init in case of Startup connect
         if self.stream.is_connected():
             self.connect_button.setText("Disonnect")
             self.configure_button.setDisabled(True)
-            self.status.setText("Connected")
+            self.status.setText("CONNECTED")
+            self.status.setStyleSheet("QLabel {color : #32a852; font-weight: bold;}")
+            self.current_data_transfert.setStyleSheet("QWidget { border: 2px #32a852 ; }")
         else :
-            self.status.setText(self.stream.startup_error)
-            self.status.setToolTip(self.stream.startup_error)
+            self.current_data_transfert.setStyleSheet("QWidget { border: 2px solid grey; }")
+            if self.stream.startup_error != "":
+                self.status.setText("ERROR ON STARTUP CONNECT !")
+                self.status.setStyleSheet("QLabel { color: #c42323;} QToolTip {font-weight: bold;}")
+                self.status.setToolTip(self.stream.startup_error)
         # SIGNALS
 
         self.configure_button.pressed.connect(lambda : self.open_configure_interface(self.stream))
@@ -243,7 +272,7 @@ class ConnectionCard :
         link_layout.addWidget(QLabel("Links : "))
         for a in range(self.max_streams):
             new_check_box = QCheckBox(str(a))
-            if self.id == a :
+            if self.stream_id == a :
                 new_check_box.setDisabled(True)
             if a in self.stream.linked_ports :
                 new_check_box.setChecked(True)
@@ -268,9 +297,9 @@ class ConnectionCard :
         """Refresh sumarry value when a setting has changed
         """
         self.current_config_overview.setText(f"Current configuration :  {self.stream.stream_type.name}\n{self.stream.to_string()}")
-        self.current_data_transfert.setText(f"in: {self.stream.data_transfer_input} kBps | out: {self.stream.data_transfer_output} kBps")
-        if not self.stream.connected and self.connect_button.text() =="disconnect" :
-            self.connect_button.setText("connect")
+        self.current_data_transfert.setText(f"In: {self.stream.data_transfer_input} kBps | Out: {self.stream.data_transfer_output} kBps")
+        if not self.stream.connected and self.connect_button.text() =="Disconnect" :
+            self.connect_button.setText("Connect")
             self.configure_button.setDisabled(False)
             self.status.setText("")
 
@@ -293,6 +322,7 @@ class ConnectionCard :
     def cleanup(self):
         """Reset thread and worker values
         """
+        print("finished")
         self.connect_thread = None
         self.worker = None
 
@@ -319,7 +349,7 @@ class ConfigureInterface(QDialog) :
     """
     def __init__(self , stream : Stream , previous_tab : int = 0 ) -> None:
         super().__init__()
-        self.setWindowTitle(f"Configure Connection {stream.id}")
+        self.setWindowTitle(f"Configure Connection {stream.stream_id}")
         self.setWindowIcon(QIcon(os.path.join(DATAFILESPATH , 'pyDatalink_icon.png')))
         self.stream = stream
         self.stream_save = copy.copy(stream)
@@ -737,7 +767,7 @@ class ConfigureInterface(QDialog) :
 
         #   SIGNALS
         self.ntrip_host_name.editingFinished.connect(lambda: self.update_mountpoint_list())
-        self.ntrip_host_name.editingFinished.emit()
+        # self.ntrip_host_name.editingFinished.emit()
 
         port.valueChanged.connect(lambda : self.stream.ntrip_client.ntrip_settings.set_port(port.value()))
 
@@ -857,18 +887,18 @@ class ConfigureInterface(QDialog) :
     def select_log_file(self , logedit : QLineEdit  , checkbox : QCheckBox):
         """open the dialog to get the path to the log file
         """
-        if checkbox.isChecked(): 
+        if checkbox.isChecked():
             file_name = QFileDialog.getSaveFileName(self,"Select log file ")
             if file_name[0] != '' and file_name[1] != '':
-                try : 
+                try :
                     self.stream.set_logging_file_name(file_name[0])
                     self.stream.set_logging()
                     logedit.setDisabled(False)
                     logedit.setText(file_name[0])
-                except : 
+                except StreamException : 
                     checkbox.click()
                     logedit.setDisabled(True)
-            else: 
+            else:
                 checkbox.click()
         else :
             logedit.setDisabled(True)
@@ -891,7 +921,7 @@ class ShowDataInterface(QDialog):
         self.setMinimumSize(350,300)
         self.setBaseSize(350,300)
         self.setWindowIcon(QIcon(os.path.join(DATAFILESPATH , 'pyDatalink_icon.png')))
-        self.setWindowTitle("Data Link Connection " + str(stream.id))
+        self.setWindowTitle("Data Link Connection " + str(stream.stream_id))
         configure_layout = QVBoxLayout(self)
         self.show_data_output = QTextEdit()
         self.show_data_output.setLineWrapColumnOrWidth(1000)
@@ -1105,7 +1135,7 @@ class AboutDialog(QDialog):
     def __init__(self):
         super().__init__()
 
-        self.setWindowIcon(QIcon(DATAFILESPATH + 'pyDatalink_icon.png'))
+        self.setWindowIcon(QIcon(os.path.join(DATAFILESPATH , 'pyDatalink_icon.png')))
         self.setWindowTitle("About PyDatalink")
         button  = QDialogButtonBox.Ok
 
@@ -1117,28 +1147,19 @@ class AboutDialog(QDialog):
         # Add Warning for still in testing
         self.dialoglayout = QVBoxLayout()
 
-        content_layout = QVBoxLayout()
-        # logoLabel = QLabel()
-        # logo = QPixmap(DATAFILESPATH +"pyDatalink_Logo.png")
-        # logoLabel.setPixmap(logo)
-        # logoLabel.setFixedSize(200,100)
-        # logoLabel.setScaledContents(True)
-        # logoLabel.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        path = os.path.join(DATAFILESPATH ,"pyDatalink_Logo.png")
-        html_content = f"""
-        <h1 style="color: blue;">Welcome to PySide6</h1>
-        <p>This is a QLabel displaying <b>HTML</b> content {path}.</p>
-        <img src= {path} alt="Image" width="400" height="300">
-        """
-        html_label = QLabel()
-        html_label.setText(html_content)
-        html_label.setScaledContents(True)
-        
-        message = QLabel("Version : 1.0.0")
-        content_layout.addWidget(html_label)
-        content_layout.addWidget(message)
+        about_logo_label = QLabel()
+        logo = QPixmap(os.path.join(DATAFILESPATH ,"pyDatalink_Logo.png"))
+        about_logo_label.setPixmap(logo)
+        about_logo_label.setFixedSize(200,100)
+        about_logo_label.setScaledContents(True)
+        about_logo_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
-        self.dialoglayout.addLayout(content_layout)
+        about_label = QLabel()
+        about_label.setText(" PyDatalink \n Version 1.0a\n 2024 , Septentrio")
+        about_label.setStyleSheet(" font-weight: bold;")
+        about_label.setScaledContents(True)
+
+        self.dialoglayout.addLayout(pair_h_widgets(about_logo_label,about_label))
         self.dialoglayout.addWidget(self.button_box)
         self.dialoglayout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.setLayout(self.dialoglayout)
@@ -1156,7 +1177,7 @@ class SourceTableWorker(QObject):
         try :
             self.configure_interface.stream.ntrip_client.set_settings_host(self.configure_interface.ntrip_host_name.text())
         except NtripClientError:
-             self.configure_interface.stream.ntrip_client.ntrip_settings.source_table = None
+            self.configure_interface.stream.ntrip_client.ntrip_settings.source_table = None
         self.finished.emit()
 
 class StreamConnectWorker(QObject):
@@ -1173,24 +1194,20 @@ class StreamConnectWorker(QObject):
             try :
                 self.connection_card.stream.connect()
                 self.connection_card.configure_button.setDisabled(True)
-                self.connection_card.status.setText("Connected")
+                self.connection_card.status.setText("CONNECTED")
+                self.connection_card.status.setStyleSheet("QLabel { color: #32a852;}")
                 self.connection_card.connect_button.setText("disconnect")
             except StreamException as e :
-                self.connection_card.status.setText("Couldn't connect")
-                if len(e.args) > 2 :
-                    self.connection_card.status.setToolTip(str(e.args[1]))
-                else:
-                    self.connection_card.status.setToolTip(str(e.args[0]))
+                self.connection_card.status.setText("ERROR DURING CONNECTION")
+                self.connection_card.status.setToolTip(str(e))
+                self.connection_card.status.setStyleSheet("QLabel { color: #c42323;}")
         else :
             try :
                 self.connection_card.stream.disconnect()
                 self.connection_card.configure_button.setDisabled(False)
                 self.connection_card.status.setText("")
-                self.connection_card.connect_button.setText("connect")
+                self.connection_card.connect_button.setText("Connect")
             except StreamException as e :
                 self.connection_card.status.setText("Couldn't disconnect")
-                if len(e.args) > 2 :
-                    self.connection_card.status.setToolTip(str(e.args[1]))
-                else:
-                    self.connection_card.status.setToolTip(str(e.args[0]))
+                self.connection_card.status.setToolTip(str(e))
         self.finished.emit()

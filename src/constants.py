@@ -32,15 +32,12 @@ import datetime
 import sys
 
 if getattr(sys, 'frozen', False):
-    # L'application est en cours d'exécution en tant qu'exécutable
     PROJECTPATH = sys._MEIPASS
     DATAFILESPATH = os.path.join(PROJECTPATH, "data" )
-    
 else:
-    # L'application est en cours d'exécution en mode script
     PROJECTPATH = os.path.abspath(os.path.dirname(__file__)).replace("\\src","") #Path to the project folder
     DATAFILESPATH = os.path.join(PROJECTPATH , "src" , "Data Files" )
-print(DATAFILESPATH)
+    
 APPNAME = "PyDataLink"
 MAINSCRIPTPATH = os.path.join(PROJECTPATH , "pyDatalink.py")
 

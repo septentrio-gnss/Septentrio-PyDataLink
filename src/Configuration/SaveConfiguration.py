@@ -45,16 +45,18 @@ def create_conf_file(app):
     """
     Create the default configuration file with the current values 
     """
-    conf_file_name = constants.CONFIGPATH + "/temp"
-    try :
-        conf_file = open(conf_file_name, "w",encoding='utf-8')
-    except Exception as e : 
-        raise SaveConfigurationException(e) from e
+    conf_file_name = constants.DEFAULTCONFIGFILE
+    # try :
+    #     conf_file = open(conf_file_name, "w",encoding='utf-8')
+    # except Exception as e :
+    #     raise SaveConfigurationException(e) from e
     # Add content to the file
     config = configparser.ConfigParser()
+    file = config.read(constants.DEFAULTCONFIGFILE)
+    
     for stream  in app.stream_list :
-        section_name = "Port"+str(stream.id)
-        config.add_section(section_name)
+        section_name = "Port"+str(stream.stream_id)
+        # config.add_section(section_name)
         config.set(section_name,"linksChecked" , str(stream.linked_ports))
         config.set(section_name,"startup_script" ,str(stream.send_startup_script ))
         config.set(section_name,"startupScriptFile" , stream.startup_script)
@@ -67,13 +69,9 @@ def create_conf_file(app):
         save_serial_config(stream ,section_name , config)
         save_ntrip_config(stream , section_name , config)
 
-    config.add_section("Preferences")
     save_preferences_config(app.preferences, "Preferences" , config)
-    config.write(conf_file)
-    conf_file.close()
-    if os.path.exists(constants.DEFAULTCONFIGFILE) :
-        os.remove(constants.DEFAULTCONFIGFILE)
-    os.rename(conf_file_name , constants.DEFAULTCONFIGFILE)
+    with open(constants.DEFAULTCONFIGFILE, 'w' , encoding="utf-8") as configfile:
+        config.write(configfile)
 
 # Saving config File
 def save_udp_config(stream : Stream,section_name : str,save_config_file:configparser.ConfigParser):

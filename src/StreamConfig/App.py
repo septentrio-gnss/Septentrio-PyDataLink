@@ -99,7 +99,9 @@ class App :
         if config_type.value == ConfigurationType.FILE.value :
             config = configparser.ConfigParser()
             read_value = config.read(self.config_file)
-            if len(read_value) != 0 :
+            if len(config.sections()) == 0 :
+                raise ConfigurationFileEmpty("Configuration file is empty")
+            else :
                 try :
                     new_max_stream = int(config.get("Preferences","numberOfPortPanels"))
                     if self.max_stream > new_max_stream and new_max_stream > 0 :
@@ -126,8 +128,7 @@ class App :
                                     self.stream_list[port_id].startup_error =f"Ntrip stream couldn't start properly : \n {e}"
                                 except Exception as e:
                                     self.stream_list[port_id].startup_error =f"Stream couldn't start properly : \n {e}"
-            else :
-                raise ConfigurationFileEmpty("Configuration file is empty")
+            
         else :
             iterator = 0
             for stream in self.stream_settings_list :
