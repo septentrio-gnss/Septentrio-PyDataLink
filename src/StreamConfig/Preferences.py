@@ -77,3 +77,4 @@ class Preferences :
         """
         return self.line_termination.replace("\n","\\n").replace("\r","\\r")
 
+

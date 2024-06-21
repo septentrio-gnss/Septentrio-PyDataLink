@@ -593,15 +593,15 @@ class TerminalUserInterface :
             
             def Configure_NTRIP_Mountpoint_menu():
                 print(NTRIP_title)
-                if selectedPort.ntrip_client.ntrip_settings.host is not None and selectedPort.ntrip_client.ntrip_settings.sourceTable is not None: 
+                if selectedPort.ntrip_client.ntrip_settings.host is not None and selectedPort.ntrip_client.ntrip_settings.source_table is not None: 
                     listofMountPoint = []
-                    for sourceTable in selectedPort.ntrip_client.ntrip_settings.sourceTable:
-                        listofMountPoint.append(sourceTable.mountpoint)
+                    for source_table in selectedPort.ntrip_client.ntrip_settings.source_table:
+                        listofMountPoint.append(source_table.mountpoint)
                     listofMountPoint.append("[q] - Back")
                     terminalMenu = TerminalMenu(listofMountPoint ,clear_screen=False, title="Configuration Menu : Stream %d \n NTRIP Configuration Menu \n Choose a mountpoint \n" %(selectedPort.id) )
                     mountPointIndex = terminalMenu.show()
                     if mountPointIndex < len(listofMountPoint) - 1 :
-                        selectedPort.ntrip_client.ntrip_settings.setMountpoint(listofMountPoint[mountPointIndex])
+                        selectedPort.ntrip_client.ntrip_settings.set_mountpoint(listofMountPoint[mountPointIndex])
                 return Configure_Stream_NTRIP_menu()
             
             def Configure_NTRIP_Username_menu():
@@ -609,7 +609,7 @@ class TerminalUserInterface :
                 print("Enter a valid username ")
                 newusername = input()
                 if len(newusername) !=0:
-                    selectedPort.ntrip_client.ntrip_settings.setUsername(newusername)
+                    selectedPort.ntrip_client.ntrip_settings.set_username(newusername)
                 return Configure_Stream_NTRIP_menu()
             
             def Configure_NTRIP_Password_menu():
@@ -617,7 +617,7 @@ class TerminalUserInterface :
                 print("Enter a valid password ")
                 newpassword = input()
                 if len(newpassword) !=0:
-                    selectedPort.ntrip_client.ntrip_settings.setPassword(newpassword)
+                    selectedPort.ntrip_client.ntrip_settings.set_password(newpassword)
                 return Configure_Stream_NTRIP_menu()
             
             def Configure_NTRIP_Auth_menu():

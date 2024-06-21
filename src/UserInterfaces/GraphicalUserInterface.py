@@ -1,23 +1,17 @@
 
-import threading
+import math
+import copy
 from ..StreamConfig.Stream import *
 from ..StreamConfig.App import *
 from ..StreamSettings import SerialSettings ,TcpSettings , UdpSettings
 from ..constants import *
-import copy
-import PySide6.QtAsyncio as QtAsyncio
-from PySide6.QtCore import QSize, Qt , QRegularExpression , QUrl, QThread , Signal , Slot , QThreadPool
-from PySide6.QtGui import  QRegularExpressionValidator,QTextCursor,QAction,QIcon,QDesktopServices,QPixmap , QColor
-from PySide6.QtWidgets import (QMainWindow, QApplication, QCheckBox, QComboBox,
-                               QCommandLinkButton, QDateTimeEdit, QDial,
-                               QDialog, QDialogButtonBox, QFileSystemModel,
-                               QGridLayout, QGroupBox, QHBoxLayout, QLabel,
-                               QLineEdit, QListView, QMenu, QPlainTextEdit,
-                               QProgressBar, QPushButton, QRadioButton,
-                               QScrollBar, QSizePolicy, QMessageBox, QSpinBox,
-                               QStyleFactory, QTableWidget, QTabWidget,
-                               QTextBrowser, QTextEdit,
-                               QTreeView, QVBoxLayout, QWidget, QInputDialog,QFileDialog)
+
+from PySide6.QtCore import QObject, Qt , QRegularExpression , QUrl, QThread , Signal
+from PySide6.QtGui import  QRegularExpressionValidator,QTextCursor,QAction,QIcon,QDesktopServices
+from PySide6.QtWidgets import (QMainWindow, QApplication, QCheckBox, QComboBox, QFrame,
+                               QDialog, QDialogButtonBox,QGridLayout, QGroupBox, QHBoxLayout, QLabel,
+                               QLineEdit, QPushButton, QRadioButton, QMessageBox,
+                               QSpinBox,QTabWidget, QTextEdit,QVBoxLayout, QWidget,QFileDialog)
 
 
 def pair_h_widgets( *widgets ) -> QHBoxLayout:
@@ -48,7 +42,7 @@ class GraphicalUserInterface(QMainWindow):
 
     def __init__(self, app : App) -> None:
         super().__init__()
-        self.setFixedSize(950,750)
+        
         self.setWindowIcon(QIcon(os.path.join(DATAFILESPATH , 'pyDatalink_icon.png')))
         self.app : App = app
         self.streams_widget : list[ConnectionCard] = []
@@ -98,26 +92,35 @@ class GraphicalUserInterface(QMainWindow):
         main_layout = QGridLayout()
         connection_card_layout = QVBoxLayout()
         connection_card_line_layout = QHBoxLayout()
+        number_card_per_line = math.ceil(self.app.max_stream / 2)
+        number_line = int(self.app.max_stream /number_card_per_line)
         for i in range(self.app.max_stream):
             new_card = ConnectionCard(i,self.app.stream_list[i],self.app.max_stream)
             self.streams_widget.append(new_card)
             connection_card_line_layout.addWidget(new_card.get_card_widget())
-            if connection_card_line_layout.count() == 3 :
+            if connection_card_line_layout.count() == number_card_per_line :
                 connection_card_layout.addLayout(connection_card_line_layout)
                 connection_card_line_layout = QHBoxLayout()
+                connection_card_line_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
-        if connection_card_line_layout.count() < 3 :
+        if connection_card_line_layout.count() < number_card_per_line :
             connection_card_layout.addLayout(connection_card_line_layout)
 
-        main_layout.addLayout(connection_card_layout,0,0)
+        print(number_line)
+        window_height = (350 * number_line) + 50
+        window_width = (300 * number_card_per_line) + 20
+        self.setFixedSize(window_width,window_height)
 
+        main_layout.addLayout(connection_card_layout,0,0)
+        main_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         widget = QWidget()
         widget.setLayout(main_layout)
         self.setCentralWidget(widget)
 
         self.timer_id = self.startTimer(30)
 
-    def timeEvent(self, event):
+    def timerEvent(self, event):
         for widget in self.streams_widget:
             widget.refresh_cards()
 
@@ -152,6 +155,9 @@ class ConnectionCard :
         self.id = id
         self.max_streams = max_streams
         self.connection_card_widget = self.connection_card()
+        self.connect_thread = None
+        self.worker = None
+        self.show_data_dialog = None
 
     def connection_card(self):
         """create the card widget
@@ -179,31 +185,48 @@ class ConnectionCard :
         # Status
         self.status= QLabel()
         self.status.setAlignment(Qt.AlignHCenter)
+        self.status.setFixedSize(280,50)
 
         #Data Transfert
         self.current_data_transfert = QLabel()
         self.current_data_transfert.setText(f"ingoing : {self.stream.data_transfer_input} kBps | outgoing : {self.stream.data_transfer_output} kBps")
         self.current_data_transfert.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.current_data_transfert.setStyleSheet("QWidget { border: 2px solid grey; }")
+        self.current_data_transfert.setFixedSize(160,24)
 
         #showdata
+        
         self.show_data_button = QPushButton("Show Data")
-
-       
-
+        bottom_layout = pair_h_widgets(self.show_data_button , self.current_data_transfert)
+        
+        #Separator
+        separator : list[QFrame] = []
+        for _ in range(3) :
+            new_separator = QFrame()
+            new_separator.setFrameShape(QFrame.HLine)
+            new_separator.setFrameShadow(QFrame.Sunken)
+            new_separator.setLineWidth(1)
+            separator.append(new_separator)
+        
         # Final Layout
         card_layout = QVBoxLayout(result)
         card_layout.addLayout(top_button_layout)
+        card_layout.addLayout(bottom_layout)
+        card_layout.addWidget(separator[0])
         card_layout.addWidget(self.current_config_overview)
+        card_layout.addWidget(separator[1])
+        card_layout.addWidget(self.link_layout())
+        card_layout.addWidget(separator[2])
         card_layout.addWidget(self.status)
-        card_layout.addWidget(self.current_data_transfert)
-        card_layout.addLayout(self.link_layout())
-        card_layout.addWidget(self.show_data_button)
 
         #Init in case of Startup connect
         if self.stream.is_connected():
             self.connect_button.setText("Disonnect")
             self.configure_button.setDisabled(True)
             self.status.setText("Connected")
+        else :
+            self.status.setText(self.stream.startup_error)
+            self.status.setToolTip(self.stream.startup_error)
         # SIGNALS
 
         self.configure_button.pressed.connect(lambda : self.open_configure_interface(self.stream))
@@ -214,7 +237,9 @@ class ConnectionCard :
     def link_layout(self):
         """create the link check box for a connection card
         """
-        link_layout = QHBoxLayout()
+        link_widget = QWidget()
+        
+        link_layout = QHBoxLayout(link_widget)
         link_layout.addWidget(QLabel("Links : "))
         for a in range(self.max_streams):
             new_check_box = QCheckBox(str(a))
@@ -225,7 +250,7 @@ class ConnectionCard :
             new_check_box.stateChanged.connect(lambda state,x=a : self.toggle_linked_port(x))
 
             link_layout.addWidget(new_check_box)
-        return link_layout
+        return link_widget
 
     def toggle_linked_port(self , linkindex):
         """update linked ports of stream when checkbox is check or uncheck
@@ -242,40 +267,34 @@ class ConnectionCard :
     def refresh_cards(self):
         """Refresh sumarry value when a setting has changed
         """
-        self.current_config_overview.setText(f"Current configuration :\n {self.stream.to_string()}")
-        self.current_data_transfert.setText(f"inconming : {self.stream.data_transfer_input} kBps | outgoing : {self.stream.data_transfer_output} kBps")
+        self.current_config_overview.setText(f"Current configuration :  {self.stream.stream_type.name}\n{self.stream.to_string()}")
+        self.current_data_transfert.setText(f"in: {self.stream.data_transfer_input} kBps | out: {self.stream.data_transfer_output} kBps")
         if not self.stream.connected and self.connect_button.text() =="disconnect" :
             self.connect_button.setText("connect")
             self.configure_button.setDisabled(False)
             self.status.setText("")
 
     def connect_stream(self):
-        """Connect the stream is not connected 
+        """Connect or disconnect the stream 
         """
-        if not self.stream.connected:
-            try :
-                self.stream.connect()
-                self.configure_button.setDisabled(True)
-                self.status.setText("Connected")
-                self.connect_button.setText("disconnect")
-            except Exception as e :
-                self.status.setText("Couldn't connect")
-                if len(e.args) > 1  :
-                    self.status.setToolTip(str(e.args[1]))
-                else :
-                    self.status.setToolTip(str(e.args[0]))
-        else :
-            try :
-                self.stream.disconnect()
-                self.configure_button.setDisabled(False)
-                self.status.setText("")
-                self.connect_button.setText("connect")
-            except Exception as e :
-                self.status.setText("Couldn't disconnect")
-                if len(e.args) > 1  :
-                    self.status.setToolTip(str(e.args[1]))
-                else :
-                    self.status.setToolTip(str(e.args[0]))
+        self.connect_button.setDisabled(True)
+        self.connect_thread = QThread()
+        self.worker = StreamConnectWorker(self)
+        self.worker.moveToThread(self.connect_thread)
+        self.connect_thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.connect_thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.connect_thread.finished.connect(self.connect_thread.deleteLater)
+        self.connect_thread.finished.connect(self.cleanup)
+        self.worker.finished.connect(lambda : self.connect_button.setDisabled(False) )
+
+        self.connect_thread.start()
+
+    def cleanup(self):
+        """Reset thread and worker values
+        """
+        self.connect_thread = None
+        self.worker = None
 
     def show_data(self):
         """open the dialog to visualize the incoming or outgoing data
@@ -283,6 +302,7 @@ class ConnectionCard :
         if self.stream.show_incoming_data.is_set() or self.stream.show_outgoing_data.is_set():
             self.show_data_button.setText("Show Data")
             self.show_data_dialog.close_dialog()
+            self.show_data_dialog = None
         else:
             self.show_data_dialog = ShowDataInterface(self.stream)
             self.show_data_dialog.finished.connect(lambda : self.show_data_button.setText("Show Data"))
@@ -307,6 +327,8 @@ class ConfigureInterface(QDialog) :
         self.setFixedSize(350,580)
         configure_layout = QVBoxLayout(self)
         self.previous_tab = previous_tab
+        self.update_thread = None
+        self.worker = None
         
         serial_menu = self.serial_menu()
         tcp_menu = self.tcp_menu()
@@ -480,7 +502,7 @@ class ConfigureInterface(QDialog) :
     def tcp_menu(self):
         """TCP config tab
         """
-        result = QWidget()       
+        result = QWidget()
         result_layout = QVBoxLayout(result)
 
         # Connection mode Box
@@ -571,10 +593,10 @@ class ConfigureInterface(QDialog) :
 
         data_flow_box_layout = QHBoxLayout(data_flow_box)
         data_flow_list = QComboBox()
-        for dataflow in DataFlow :
+        for dataflow in UdpSettings.DataFlow :
             data_flow_list.addItem( dataflow.name , dataflow )
-        if self.stream.udp_settings.DataFlow is not None :
-            index = data_flow_list.findData(self.stream.udp_settings.DataFlow) 
+        if self.stream.udp_settings.dataflow is not None :
+            index = data_flow_list.findData(self.stream.udp_settings.dataflow)
         data_flow_list.setCurrentIndex(index)
         data_flow_box_layout.addWidget(data_flow_list)
 
@@ -683,7 +705,7 @@ class ConfigureInterface(QDialog) :
         latitude.setInputMask("!N 99.999999999")
         input_validator = QRegularExpressionValidator(QRegularExpression("[NS] [0-9]{2}.[0-9]{9}"))
         latitude.setValidator(input_validator)
-        latitude.setText(self.stream.ntrip_client.ntrip_settings.getLatitude())
+        latitude.setText(self.stream.ntrip_client.ntrip_settings.get_latitude())
         latitude_label= QLabel("Latitude : ")
         latitude_label.setBuddy(latitude)
         fixed_position_box_layout.addLayout(pair_h_widgets(latitude_label,latitude))
@@ -692,7 +714,7 @@ class ConfigureInterface(QDialog) :
         longitude.setInputMask("!E 999.999999999")
         input_validator = QRegularExpressionValidator(QRegularExpression("[EW] [0-9]{3}.[0-9]{9}"))
         longitude.setValidator(input_validator)
-        longitude.setText(self.stream.ntrip_client.ntrip_settings.getLongitude())
+        longitude.setText(self.stream.ntrip_client.ntrip_settings.get_longitude())
         longitude_label= QLabel("Longitude : ")
         longitude_label.setBuddy(longitude)
         fixed_position_box_layout.addLayout(pair_h_widgets(longitude_label,longitude))
@@ -715,22 +737,22 @@ class ConfigureInterface(QDialog) :
 
         #   SIGNALS
         self.ntrip_host_name.editingFinished.connect(lambda: self.update_mountpoint_list())
-        # self.ntrip_host_name.editingFinished.emit()
+        self.ntrip_host_name.editingFinished.emit()
 
         port.valueChanged.connect(lambda : self.stream.ntrip_client.ntrip_settings.set_port(port.value()))
 
-        self.mountpoint_list.currentIndexChanged.connect(lambda : self.stream.ntrip_client.ntrip_settings.setMountpoint(self.mountpoint_list.currentData()))
+        self.mountpoint_list.currentIndexChanged.connect(lambda : self.stream.ntrip_client.ntrip_settings.set_mountpoint(self.mountpoint_list.currentData()))
 
-        auth_box.toggled.connect(lambda : self.stream.ntrip_client.ntrip_settings.setAuth(auth_box.isChecked()))
-        user.editingFinished.connect(lambda : self.stream.ntrip_client.ntrip_settings.setUsername(user.text()))
-        password.editingFinished.connect(lambda : self.stream.ntrip_client.ntrip_settings.setPassword(password.text()))
-        fixed_position_box.toggled.connect(lambda : self.stream.ntrip_client.ntrip_settings.setFixedPos(fixed_position_box.isChecked()))
-        latitude.editingFinished.connect(lambda : self.stream.ntrip_client.ntrip_settings.setLatitude(latitude.text()))
-        longitude.editingFinished.connect(lambda : self.stream.ntrip_client.ntrip_settings.setLongitude(longitude.text()))
-        height.valueChanged.connect(lambda x : self.stream.ntrip_client.ntrip_settings.setHeight(height.value()))
+        auth_box.toggled.connect(lambda : self.stream.ntrip_client.ntrip_settings.set_auth(auth_box.isChecked()))
+        user.editingFinished.connect(lambda : self.stream.ntrip_client.ntrip_settings.set_username(user.text()))
+        password.editingFinished.connect(lambda : self.stream.ntrip_client.ntrip_settings.set_password(password.text()))
+        fixed_position_box.toggled.connect(lambda : self.stream.ntrip_client.ntrip_settings.set_fixed_pos(fixed_position_box.isChecked()))
+        latitude.editingFinished.connect(lambda : self.stream.ntrip_client.ntrip_settings.set_latitude(latitude.text()))
+        longitude.editingFinished.connect(lambda : self.stream.ntrip_client.ntrip_settings.set_longitude(longitude.text()))
+        height.valueChanged.connect(lambda x : self.stream.ntrip_client.ntrip_settings.set_height(height.value()))
         cert_select_file.pressed.connect(self.select_cert_file )
-        self.cert.editingFinished.connect(lambda : self.stream.ntrip_client.ntrip_settings.setCert(self.cert.text()))
-        tls_box.toggled.connect(lambda : self.stream.ntrip_client.ntrip_settings.setTls(tls_box.isChecked()))
+        self.cert.editingFinished.connect(lambda : self.stream.ntrip_client.ntrip_settings.set_cert(self.cert.text()))
+        tls_box.toggled.connect(lambda : self.stream.ntrip_client.ntrip_settings.set_tls(tls_box.isChecked()))
         return result
         
     def update_mountpoint_list(self):
@@ -738,14 +760,24 @@ class ConfigureInterface(QDialog) :
         """
         self.mountpoint_list.clear()
         self.mountpoint_list.setPlaceholderText("Waiting for source table ...")
-        update_thread = ConfigurationThread(self)
-        # update_thread.finished.connect(lambda : self.task_get_new_source_table())
-        # update_thread.finished.connect(update_thread.deleteLater)
-        update_thread.start()
+        self.update_thread = QThread()
+        self.worker = SourceTableWorker(self)
+        self.worker.moveToThread(self.update_thread)
+        self.update_thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.update_thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.update_thread.finished.connect(self.update_thread.deleteLater)
+        self.update_thread.finished.connect(self.cleanup)
+        self.worker.finished.connect(self.task_get_new_source_table)
+
+        self.update_thread.start()
+
+    def cleanup(self):
+        self.update_thread = None
+        self.worker = None
 
     def task_get_new_source_table(self):
         """ get new source table from the new ntrip caster
-        
         """
         if len(self.ntrip_host_name.text()) < 1 :
             self.mountpoint_list.setPlaceholderText("List unavailable")
@@ -753,8 +785,8 @@ class ConfigureInterface(QDialog) :
             try :
                 self.stream.ntrip_client.set_settings_host(self.ntrip_host_name.text())
 
-                if len(self.stream.ntrip_client.ntrip_settings.sourceTable) != 0:
-                    for source in self.stream.ntrip_client.ntrip_settings.sourceTable:
+                if len(self.stream.ntrip_client.ntrip_settings.source_table) != 0:
+                    for source in self.stream.ntrip_client.ntrip_settings.source_table:
                         self.mountpoint_list.addItem(source.mountpoint, source.mountpoint)
                         if self.stream.ntrip_client.ntrip_settings.mountpoint is not None:
                             index = self.mountpoint_list.findData(self.stream.ntrip_client.ntrip_settings.mountpoint)
@@ -764,7 +796,7 @@ class ConfigureInterface(QDialog) :
                         self.mountpoint_list.setCurrentIndex(index)
                 else :
                     self.mountpoint_list.setPlaceholderText("List unavailable")
-            except :
+            except NtripClientError :
                 self.mountpoint_list.setPlaceholderText("List unavailable")
 
     def bottom_button_layout(self):
@@ -790,7 +822,7 @@ class ConfigureInterface(QDialog) :
         """function called when ok button is pressed
         """
         if self.stream.ntrip_client.ntrip_settings.fixed_pos :
-            self.stream.ntrip_client._create_gga_string()
+            self.stream.ntrip_client.create_gga_string()
         self.accept()
 
     def cancel(self):
@@ -805,7 +837,7 @@ class ConfigureInterface(QDialog) :
         if checkbox.isChecked():
             file_name = QFileDialog.getOpenFileName(self,"Select Script")
             if file_name[0] != '' and file_name[1] != '':
-                try : 
+                try :
                     if connect_script:
                         self.stream.set_startup_script_path(file_name[0])
                         self.stream.set_startup_script()
@@ -814,7 +846,7 @@ class ConfigureInterface(QDialog) :
                         self.stream.set_close_script()
                     input_widget.setDisabled(False)
                     input_widget.setText(file_name[0])
-                except : 
+                except StreamException :
                     checkbox.click()
                     input_widget.setDisabled(True)
             else:
@@ -847,7 +879,7 @@ class ConfigureInterface(QDialog) :
         file_name = QFileDialog.getOpenFileName(self,"Select certificat")
         if file_name[0] != '' and file_name[1] != '':
             if file_name[1] in [ ".cer", ".crt", ".pem"  ,".key"] :
-                self.stream.ntrip_client.ntrip_settings.setCert(file_name[0])
+                self.stream.ntrip_client.ntrip_settings.set_cert(file_name[0])
                 self.cert.setText(file_name[0])
  
 class ShowDataInterface(QDialog):
@@ -883,9 +915,7 @@ class ShowDataInterface(QDialog):
         configure_layout.addWidget(show_data)
         configure_layout.addLayout(self.bottom_button())
 
-        
-
-    def timeEvent(self, event):
+    def timerEvent(self, event):
         if self.stream.data_to_show.empty() is False :
             value = self.stream.data_to_show.get()
             if not self.freeze :
@@ -1113,30 +1143,54 @@ class AboutDialog(QDialog):
         self.dialoglayout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.setLayout(self.dialoglayout)
 
-class ConfigurationThread(QThread):
-    """custom thread for qt threading
+class SourceTableWorker(QObject):
+    """worker for getting source table thread
     """
     finished = Signal()
 
     def __init__(self, configure_interface : ConfigureInterface):
         super().__init__()
         self.configure_interface = configure_interface
-        self.finished.connect(self.handle_signal)
 
-    def emit_signal(self):
-        # Emit the signal using the instance
-        self.finished.emit()
-
-    def handle_signal(self):
-        print("Signal received and handled")
-        
-    @Slot()
     def run(self):
-        """run thread function
-        """
         try :
             self.configure_interface.stream.ntrip_client.set_settings_host(self.configure_interface.ntrip_host_name.text())
-        except Exception as e :
-            print(e)
-            self.configure_interface.stream.ntrip_client.ntrip_settings.sourceTable = None
+        except NtripClientError:
+             self.configure_interface.stream.ntrip_client.ntrip_settings.source_table = None
+        self.finished.emit()
+
+class StreamConnectWorker(QObject):
+    """Worker for stream connect thread
+    """
+    finished = Signal()
+
+    def __init__(self, connection_card : ConnectionCard):
+        super().__init__()
+        self.connection_card = connection_card
+
+    def run(self):
+        if not self.connection_card.stream.connected:
+            try :
+                self.connection_card.stream.connect()
+                self.connection_card.configure_button.setDisabled(True)
+                self.connection_card.status.setText("Connected")
+                self.connection_card.connect_button.setText("disconnect")
+            except StreamException as e :
+                self.connection_card.status.setText("Couldn't connect")
+                if len(e.args) > 2 :
+                    self.connection_card.status.setToolTip(str(e.args[1]))
+                else:
+                    self.connection_card.status.setToolTip(str(e.args[0]))
+        else :
+            try :
+                self.connection_card.stream.disconnect()
+                self.connection_card.configure_button.setDisabled(False)
+                self.connection_card.status.setText("")
+                self.connection_card.connect_button.setText("connect")
+            except StreamException as e :
+                self.connection_card.status.setText("Couldn't disconnect")
+                if len(e.args) > 2 :
+                    self.connection_card.status.setToolTip(str(e.args[1]))
+                else:
+                    self.connection_card.status.setToolTip(str(e.args[0]))
         self.finished.emit()

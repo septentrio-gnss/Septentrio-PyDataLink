@@ -27,11 +27,20 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
-from enum import Enum
 import socket
 import logging
+from enum import Enum
 from ..constants import DEFAULTLOGFILELOGGER
+
+
+class TCPSettingsException(Exception):
+    """
+        Exception class for tcp settings 
+    """
+    def __init__(self, message, error_code = None):
+        super().__init__(message)
+        self.error_code = error_code
+
 
 class StreamMode(Enum):
     """ Stream mode of the TCP port
@@ -79,7 +88,7 @@ class TcpSettings:
         except socket.error as e :
             if self.log_file is not None :
                 self.log_file.error("Failed to start socket : %s" , e)
-            raise e
+            raise TCPSettingsException(e) from e
         match self.stream_mode :
             case StreamMode.CLIENT :
                 try :
@@ -88,7 +97,7 @@ class TcpSettings:
                 except socket.error as e :
                     if self.log_file is not None :
                         self.log_file.error("Failed to open the Client socket ( host : %s and port : %s) : %s",self.host , self.port , e)
-                    raise e
+                    raise TCPSettingsException(e) from e
             case StreamMode.SERVER :
                 try :
                     newsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -97,7 +106,7 @@ class TcpSettings:
                 except socket.error as e :
                     if self.log_file is not None :
                         self.log_file.error("Failed to open the Server socket : %s" , e)
-                    raise e
+                    raise TCPSettingsException(e) from e
 
 
     def set_host(self, new_host : str):

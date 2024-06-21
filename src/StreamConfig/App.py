@@ -30,11 +30,28 @@
 import configparser
 from enum import Enum
 import queue
+
+from ..NTRIP.NtripClient import NtripClientError
 from .Preferences import Preferences
 from .Stream import Stream
 from ..Configuration import SaveConfiguration , CommandLineConfiguration , FileConfiguration
 
 
+class AppException(Exception):
+    """
+        Exception class for App 
+    """
+    def __init__(self, message, error_code = None):
+        super().__init__(message)
+        self.error_code = error_code
+        
+class ConfigurationFileEmpty(AppException):
+    """Raised when the configuration file is empty
+    """
+    
+class InvalidStreamTypeException(AppException):
+    """Raised when the given stream type is not supported
+    """
 class ConfigurationType(Enum):
     """Type of configuration that need to be executed 
     """
@@ -54,7 +71,7 @@ class App :
                  stream_settings_list : list[str] = None ,
                  configuration_type : ConfigurationType = ConfigurationType.DEFAULT ,
                  debug_logging : bool = False):
-        
+
         self.preferences : Preferences = Preferences()
         self.max_stream :int  = max_stream
         self.stream_settings_list : list[str] = stream_settings_list
@@ -76,10 +93,10 @@ class App :
         if configuration_type != ConfigurationType.DEFAULT:
             self.configure_app( configuration_type)
 
-    def configure_app(self , type : ConfigurationType ):
+    def configure_app(self , config_type : ConfigurationType ):
         """ Configure app according to the configuration type selected
         """
-        if type.value == ConfigurationType.FILE.value :
+        if config_type.value == ConfigurationType.FILE.value :
             config = configparser.ConfigParser()
             read_value = config.read(self.config_file)
             if len(read_value) != 0 :
@@ -87,7 +104,7 @@ class App :
                     new_max_stream = int(config.get("Preferences","numberOfPortPanels"))
                     if self.max_stream > new_max_stream and new_max_stream > 0 :
                         diff = self.max_stream - new_max_stream
-                        for i in range(diff) : 
+                        for i in range(diff) :
                             self.stream_list.pop(self.max_stream - i - 1)
                         self.max_stream = new_max_stream
                 finally :
@@ -96,31 +113,35 @@ class App :
                         if "Preferences" in key:
                             FileConfiguration.conf_file_preference(self.preferences, config[key] )
                         if "Port" in key :
-                            FileConfiguration.conf_file_config(self.stream_list[next_stream_id],config[key])
-                            next_stream_id +=1
+                            if next_stream_id < self.max_stream :
+                                FileConfiguration.conf_file_config(self.stream_list[next_stream_id],config[key])
+                                next_stream_id +=1
                     for port_id, value  in enumerate(self.preferences.connect):
-                        self.stream_list[port_id].set_line_termination(self.preferences.line_termination)
-                        if value :
-                            try :
-                                self.stream_list[port_id].connect(self.stream_list[port_id].stream_type)
-                            except Exception as e:
-                                print(f"Stream {port_id} couldn't start properly , {e}")
+                        if port_id < self.max_stream:
+                            self.stream_list[port_id].set_line_termination(self.preferences.line_termination)
+                            if value :
+                                try :
+                                    self.stream_list[port_id].connect(self.stream_list[port_id].stream_type)
+                                except (NtripClientError) as e :
+                                    self.stream_list[port_id].startup_error =f"Ntrip stream couldn't start properly : \n {e}"
+                                except Exception as e:
+                                    self.stream_list[port_id].startup_error =f"Stream couldn't start properly : \n {e}"
             else :
-                raise Exception("Init Error","The given file is empty")
+                raise ConfigurationFileEmpty("Configuration file is empty")
         else :
             iterator = 0
-            for stream in self.stream_settings_list :           
+            for stream in self.stream_settings_list :
                 stream_type = stream.split("://")[0]
                 if stream_type.lower() in ["udp","udpspe","tcpcli","tcpsrv","serial","ntrip"]:
                     try :
                         CommandLineConfiguration.command_line_config(self.stream_list[iterator],stream)
                         iterator += 1
-                    except Exception as e :
+                    except CommandLineConfiguration.CommandLineConfigurationException as e :
                         print(f"Could not open {stream_type} : {e}")
                         self.close_all()
                         break
                 else :
-                    raise ValueError(f" {stream_type} is not a valid stream type")
+                    raise InvalidStreamTypeException(f" {stream_type} is not a valid stream type")
 
 
     def close_all(self):

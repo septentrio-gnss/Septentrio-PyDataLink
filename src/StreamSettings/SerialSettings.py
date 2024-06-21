@@ -31,8 +31,23 @@ from enum import Enum
 import logging
 from serial import Serial
 import serial.tools.list_ports
+from serial.serialutil import SerialException
 
 from src.constants import DEFAULTLOGFILELOGGER
+
+class SerialSettingsException(Exception):
+    """
+        Exception class for Serial settings 
+    """
+    def __init__(self, message, error_code = None):
+        super().__init__(message)
+        self.error_code = error_code
+class PortInUseException(SerialSettingsException):
+    """Raised when the given serial port is already in use
+    """
+class PortNotFound(SerialSettingsException):
+    """Raised when the port is not found
+    """
 
 class BaudRate(Enum):
     """ Baudrate of a Serial port   """
@@ -101,7 +116,7 @@ class SerialSettings:
         self.stopbits : StopBits = stopbits
         self.bytesize : ByteSize = bytesize
         self.rtscts : bool= rtscts
-                                            
+
         # Support Logging file
         if debug_logging :
             self.log_file : logging.Logger = DEFAULTLOGFILELOGGER
@@ -118,9 +133,9 @@ class SerialSettings:
         """
         ports = serial.tools.list_ports.comports()
         available_port = []
-        for port, desc, hwid in sorted(ports):
+        for port, desc, _ in sorted(ports):
             available_port.append([port, desc])
-        if self.log_file is not None : 
+        if self.log_file is not None :
             self.log_file.debug("%s serial port detected" , str(len(available_port)))
         return available_port
 
@@ -139,21 +154,20 @@ class SerialSettings:
             new_serial.port = self.port
             new_serial.open()
             return new_serial
-        except Exception as e:
-            print(e)
-            if e.args[0] == 11 or "PermissionError" in e.args[0] : 
+        except SerialException as e:
+            if e.args[0] == 11 or "PermissionError" in e.args[0]:
                 if self.log_file is not None :
                     self.log_file.error("Port %s is already in use" ,self.port )
-                raise Exception ("PortError","Port already in use")
+                raise PortInUseException("Port already in use") from e
             elif "FileNotFoundError" in e.args[0]:
                 if self.log_file is not None :
                     self.log_file.error("Port %s not found " ,self.port )
-                raise Exception ("PortError","Port unreachable or not available")
+                raise PortNotFound("Port unreachable or not available") from e
             else:
-                if self.log_file is not None : 
+                if self.log_file is not None :
                     self.log_file.error("Failed to open serial stream with port %s", self.port)
                     self.log_file.error("%s", e)
-                raise(e)
+                raise SerialSettingsException(e) from e
 
     def set_port(self, newport : str):
         """

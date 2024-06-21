@@ -27,10 +27,18 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from enum import Enum
 import socket
 import logging
+from enum import Enum
 from ..constants import DEFAULTLOGFILELOGGER
+
+class UDPSettingsException(Exception):
+    """
+        Exception class for udp settings 
+    """
+    def __init__(self, message, error_code = None):
+        super().__init__(message)
+        self.error_code = error_code
 
 class DataFlow(Enum):
     """
@@ -63,7 +71,7 @@ class UdpSettings:
         """
         self.host : str = host
         self.port : int = port
-        self.DataFlow : DataFlow = dataflow
+        self.dataflow : DataFlow = dataflow
         self.specific_host : bool  = specific_host
         if debug_logging :
             self.log_file : logging.Logger = DEFAULTLOGFILELOGGER
@@ -87,7 +95,7 @@ class UdpSettings:
         except socket.error as e :
             if self.log_file is not None :
                 self.log_file.error("Failed to create socket : %s" , e)
-            raise e
+            raise UDPSettingsException(e) from e
         try :
             if self.specific_host is False:
                 newsocket.bind(('', self.port))
@@ -95,7 +103,7 @@ class UdpSettings:
         except socket.error as e :
             if self.log_file is not None :
                 self.log_file.error("Failed to create UDP server : %s" ,e)
-            raise e
+            raise UDPSettingsException(e) from e
 
 
     def set_host(self, new_host : str):
@@ -123,7 +131,7 @@ class UdpSettings:
         Args:
             new_Dataflow (DataFlow): The new Data Flow.
         """
-        self.DataFlow = new_dataflow
+        self.dataflow = new_dataflow
 
     def to_string(self) -> str :
         """
@@ -132,6 +140,6 @@ class UdpSettings:
         Returns:
             str: class as string
         """
-        return f" Host : {self.host} \n Port : {self.port} \n SpecificHost : {self.specific_host} \n DataFlow : {self.DataFlow.name}\n"
+        return f" Host : {self.host} \n Port : {self.port} \n SpecificHost : {self.specific_host} \n DataFlow : {self.dataflow.name}\n"
    
     
