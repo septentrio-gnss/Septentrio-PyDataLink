@@ -234,7 +234,7 @@ class Stream:
             elif stream_type == StreamType.NTRIP:
                 if self.ntrip_client is None or len(self.ntrip_client.ntrip_settings.host.replace(" ","")) == 0 :
                     if self.log_file is not None :
-                                self.log_file.error("Stream %s : Failed to open NTRIP stream : Incorect Settings " , self.stream_id)
+                        self.log_file.error("Stream %s : Failed to open NTRIP stream : Incorect Settings " , self.stream_id)
                     raise MissingSettingsException("ntrip client is not set !")
                 else:
                     try:
@@ -597,7 +597,7 @@ class Stream:
                 task_send_command(self.linked_data[self.stream_id],self.stream,logger=self.logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
-                    self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
+                self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
             self._exception_disconnect()
             raise ScriptFileException(f"Start script couldn't finish {e}") from e
         current_time = datetime.now()
@@ -918,6 +918,7 @@ class Stream:
         self.stream.socket.settimeout(0.1)
         temp_incoming_tranfert = 0
         temp_outgoing_tranfert = 0
+        print("ici")
         # Send startup command
         if self.log_file is not None :
             self.log_file.info("Stream %i : Task Started " , self.stream_id )
@@ -931,7 +932,7 @@ class Stream:
             if self.log_file is not None :
                     self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
             self._exception_disconnect()
-            raise ScriptFileException(f"Start script couldn't finish {e}") from e     
+            raise ScriptFileException(f"Start script couldn't finish {e}") from e    
         current_time = datetime.now()
         #Main loop
         if self.log_file is not None :
@@ -941,7 +942,8 @@ class Stream:
             temp_incoming_tranfert ,temp_outgoing_tranfert,current_time =  task_data_transfer_rate(self , current_time , temp_incoming_tranfert , temp_outgoing_tranfert) 
             try:
                 if self.stream is not None:
-                    #Read input data 
+                    print(self.stream)
+                    #Read input data
                     try:
                         incoming_data = self.stream.socket.recv(4096).decode(encoding='ISO-8859-1')
                         temp_incoming_tranfert += len(incoming_data)
@@ -1042,6 +1044,7 @@ def task_show_data(stream :Stream , data) :
     put in show data queue and log the data if wanted
     """
     if stream.show_incoming_data.is_set() and len(data) != 0:
+        print("show data")
         stream.data_to_show.put(data)
         if stream.logging:
             stream.logger.write(data)
@@ -1052,6 +1055,7 @@ def task_data_transfer_rate(stream :Stream , current_time  , temp_incoming_tranf
     """
     now = datetime.now()
     if (now-current_time).total_seconds() >=  1 :
+        print("calcule transfert rate")
         current_time = now 
         stream.data_transfer_input = round(temp_incoming_tranfert/1000,1)
         stream.data_transfer_output = round(temp_outgoing_tranfert/1000,1)

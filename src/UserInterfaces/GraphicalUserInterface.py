@@ -322,7 +322,6 @@ class ConnectionCard :
     def cleanup(self):
         """Reset thread and worker values
         """
-        print("finished")
         self.connect_thread = None
         self.worker = None
 
@@ -767,7 +766,7 @@ class ConfigureInterface(QDialog) :
 
         #   SIGNALS
         self.ntrip_host_name.editingFinished.connect(lambda: self.update_mountpoint_list())
-        # self.ntrip_host_name.editingFinished.emit()
+        self.ntrip_host_name.editingFinished.emit()
 
         port.valueChanged.connect(lambda : self.stream.ntrip_client.ntrip_settings.set_port(port.value()))
 
@@ -1196,7 +1195,7 @@ class StreamConnectWorker(QObject):
                 self.connection_card.configure_button.setDisabled(True)
                 self.connection_card.status.setText("CONNECTED")
                 self.connection_card.status.setStyleSheet("QLabel { color: #32a852;}")
-                self.connection_card.connect_button.setText("disconnect")
+                self.connection_card.connect_button.setText("Disconnect")
             except StreamException as e :
                 self.connection_card.status.setText("ERROR DURING CONNECTION")
                 self.connection_card.status.setToolTip(str(e))

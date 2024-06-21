@@ -49,6 +49,12 @@ except NotImplementedError :
 
 from src.UserInterfaces.CommandLineInterface import CommandLineInterface
 
+def clean_log_folder():
+    files = [os.path.join(LOGFILESPATH, f) for f in os.listdir(LOGFILESPATH) if os.path.isfile(os.path.join(LOGFILESPATH, f))]
+    if len(files) > 40:
+        oldest_file = min(files, key=os.path.getctime)
+        os.remove(oldest_file)
+
 
 
 def check_data_folder():
@@ -58,6 +64,8 @@ def check_data_folder():
         os.mkdir(CONFIGPATH )
     if os.path.exists( LOGFILESPATH ) is not True:
         os.mkdir(LOGFILESPATH )
+    else : 
+        clean_log_folder()
 
 class DatalinkApp:
     """Main class for Datalink application

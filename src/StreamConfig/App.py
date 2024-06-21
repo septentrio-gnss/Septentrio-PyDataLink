@@ -154,6 +154,7 @@ class App :
 
             SaveConfiguration.create_conf_file(self)
         for port in self.stream_list:
-            port.disconnect()
+            if port.is_connected() :
+                port.disconnect()
         self.linked_data.clear()
         self.stream_list.clear()
