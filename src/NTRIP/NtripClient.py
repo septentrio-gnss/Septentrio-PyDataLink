@@ -253,7 +253,7 @@ class NtripClient:
         minutes *= 60
         lon_string = f"{int(abs(degrees)):03d}{abs(minutes):08.5f},{'E' if self.ntrip_settings.longitude > 0 else 'W'}"
         height_string = f"{self.ntrip_settings.height:0.2f},M,0.00,M"
-        result = f"$GPGGA,{time_string},{lat_string},{lon_string},1,08,0.75,{height_string},*"
+        result = f"$GPGGA,{time_string},{lat_string},{lon_string},1,08,0.75,{height_string},,*"
 
         checksum = 0
 

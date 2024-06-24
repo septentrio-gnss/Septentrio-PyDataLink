@@ -249,7 +249,6 @@ class ConnectionCard :
             self.configure_button.setDisabled(True)
             self.status.setText("CONNECTED")
             self.status.setStyleSheet("QLabel {color : #32a852; font-weight: bold;}")
-            self.current_data_transfert.setStyleSheet("QWidget { border: 2px #32a852 ; }")
         else :
             self.current_data_transfert.setStyleSheet("QWidget { border: 2px solid grey; }")
             if self.stream.startup_error != "":
@@ -686,7 +685,7 @@ class ConfigureInterface(QDialog) :
         mount_point_box_layout = QVBoxLayout(mount_point_box)
         self.mountpoint_list = QComboBox()
         self.mountpoint_list.setPlaceholderText("List unavailable")
-
+        self.task_get_new_source_table()
         mount_point_box_layout.addWidget(self.mountpoint_list)
         # TLS
         tls_box = QGroupBox("TLS")
@@ -812,17 +811,18 @@ class ConfigureInterface(QDialog) :
             self.mountpoint_list.setPlaceholderText("List unavailable")
         else :
             try :
-                self.stream.ntrip_client.set_settings_host(self.ntrip_host_name.text())
-
-                if len(self.stream.ntrip_client.ntrip_settings.source_table) != 0:
-                    for source in self.stream.ntrip_client.ntrip_settings.source_table:
+                if self.stream.ntrip_client.ntrip_settings.source_table is None :
+                    self.mountpoint_list.setPlaceholderText("List unavailable")
+                
+                elif len(self.stream.ntrip_client.ntrip_settings.source_table) != 0:
+                    currentindex : int = 3
+                    for source, index in zip(self.stream.ntrip_client.ntrip_settings.source_table , range(len(self.stream.ntrip_client.ntrip_settings.source_table))):
                         self.mountpoint_list.addItem(source.mountpoint, source.mountpoint)
-                        if self.stream.ntrip_client.ntrip_settings.mountpoint is not None:
-                            index = self.mountpoint_list.findData(self.stream.ntrip_client.ntrip_settings.mountpoint)
-                        else :
-                            index : int = 3
-                        self.mountpoint_list.setPlaceholderText("")
-                        self.mountpoint_list.setCurrentIndex(index)
+                        if self.stream.ntrip_client.ntrip_settings.mountpoint is not None and self.stream.ntrip_client.ntrip_settings.mountpoint == source.mountpoint:
+                            currentindex = index
+                            
+                    self.mountpoint_list.setPlaceholderText("")
+                    self.mountpoint_list.setCurrentIndex(currentindex)
                 else :
                     self.mountpoint_list.setPlaceholderText("List unavailable")
             except NtripClientError :

@@ -146,7 +146,7 @@ class Stream:
         self.serial_settings = SerialSettings(debug_logging = debug_logging)
         self.tcp_settings = TcpSettings(debug_logging = debug_logging)
         self.udp_settings = UdpSettings(debug_logging = debug_logging)
-        self.ntrip_client = NtripClient(debug_logging = debug_logging)
+        self.ntrip_client = NtripClient()
 
     def connect(self, stream_type : StreamType = None):
         """
@@ -215,7 +215,7 @@ class Stream:
             elif stream_type == StreamType.UDP:
                 if self.udp_settings is  None:
                     if self.log_file is not None :
-                            self.log_file.error("Stream %s : Failed to open UDP stream : UDP settings not set ", self.stream_id)
+                        self.log_file.error("Stream %s : Failed to open UDP stream : UDP settings not set ", self.stream_id)
                     raise MissingSettingsException("udp settings are empty!")
                 else:
                     try:
@@ -282,10 +282,10 @@ class Stream:
 
                         self._clear_queue(self.linked_data[self.stream_id])
                         self.send_script(self.linked_data[self.stream_id], True)
-                    self.datalink_stream_thread = threading.Thread(target=task)
+                    self.datalink_stream_thread = threading.Thread(target=task,args=(self.stream, self.linked_data, self.update_linked_ports_queue,self.data_to_show))
 
                     if self.log_file is not None :
-                            self.log_file.debug("Stream %s : Starting Thread " , self.stream_id)
+                        self.log_file.debug("Stream %s : Starting Thread " , self.stream_id)
 
                     self.datalink_stream_thread.start()
                     self.current_task = task
@@ -572,15 +572,20 @@ class Stream:
             self.connected = False  
             self.data_transfer_input = 0.0
             self.data_transfer_output = 0.0
-
-    def datalink_serial_task(self):
+    
+    
+    
+    # Thread task Methods 
+    
+    def datalink_serial_task(self, serial: Serial, linked_data: list[queue.Queue], update_linked_ports_queue: queue.Queue 
+                           , data_to_show : queue.Queue  ):
         """
         The task for data link Stream using serial communication.
 
         Args:
             serial: The serial Stream object.
-            linked_data: A list of linked data queues.
-            update_linked_ports: The queue for updating linked ports.
+            linkedData: A list of linked data queues.
+            update_linked_ports_queue: The queue for updating linked ports.
 
         Returns:
             int: 0 if the task completes, otherwise None.
@@ -594,7 +599,7 @@ class Stream:
             self.log_file.info("Stream %i : sending startup script" , self.stream_id )
         try:
             if not self.linked_data[self.stream_id].empty():
-                task_send_command(self.linked_data[self.stream_id],self.stream,logger=self.logger,line_termination=self.line_termination)
+                task_send_command(self.linked_data[self.stream_id],serial,logger=self.logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
                 self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
@@ -606,42 +611,45 @@ class Stream:
             self.log_file.info("Stream %i : sending startup script finished  ", self.stream_id )
             self.log_file.info("Stream %i : start main loop",self.stream_id )
         while self.stop_event.is_set() is not True:
-            temp_incoming_tranfert ,temp_outgoing_tranfert, current_time =  task_data_transfer_rate(self , current_time , temp_incoming_tranfert , temp_outgoing_tranfert)
+            temp_incoming_tranfert ,temp_outgoing_tranfert, current_time =  self.task_data_transfer_rate( current_time , temp_incoming_tranfert , temp_outgoing_tranfert)
             try:
-                if self.stream is Serial:
-                    if self.stream.is_open:
-                        incoming_data = self.stream.readline().decode(encoding='ISO-8859-1')
+                if serial is not None:
+                    if serial.is_open:
+                        incoming_data = serial.readline().decode(encoding='ISO-8859-1')
                         temp_incoming_tranfert += len(incoming_data)
-                        # Print data if show data input
-                        task_show_data(self , incoming_data)
-                        # Send input data to linked Streams
-                        task_share_data(linked_ports , self.linked_data , incoming_data )
-                        if not self.linked_data[self.stream_id].empty():
-                            returned_value = task_send_command(self.linked_data[self.stream_id],self.stream,self.show_outgoing_data.is_set(), data_to_show=self.data_to_show,logger=self.logger,line_termination=self.line_termination )
-                            if returned_value is not None :
-                                temp_outgoing_tranfert += returned_value
+                        if self.show_incoming_data.is_set() and len(incoming_data) != 0:
+                            data_to_show.put(incoming_data)
+                            if self.logging:
+                                self.logger.write(incoming_data)
+                        if linked_ports is not None:
+                            for portid in linked_ports:
+                                port_queue: queue.Queue = linked_data[portid]
+                                port_queue.put(incoming_data)
+                        if not linked_data[self.stream_id].empty():
+                            temp_outgoing_tranfert += task_send_command(linked_data[self.stream_id],serial,self.show_outgoing_data.is_set(), data_to_show=data_to_show,logger=self.logger,line_termination=self.line_termination )
             except Exception as e:
                 self._exception_disconnect()
                 if self.log_file is not None :
                     self.log_file.error("Stream %i %s has been disconnected, error: %e",self.stream_id , self.stream_type , e )
                 raise StreamThreadException(f"Stream {self.stream_id} {self.stream_type} has been disconnected, error: {e}") from e
             #Update current linked Streams list
-            if not self.update_linked_ports_queue.empty():
-                task_update_linked_port(self.update_linked_ports , linked_ports)
+            if not update_linked_ports_queue.empty():
+                task_update_linked_port(update_linked_ports_queue, linked_ports)
         #Send closeup commands
         if self.log_file is not None :
             self.log_file.info("Stream %i : main loop ended ",self.stream_id )
             self.log_file.info("Stream %i : sending closing script" , self.stream_id )
         try :
             if not self.linked_data[self.stream_id].empty():
-                task_send_command(self.linked_data[self.stream_id],self.stream,logger=self.logger,line_termination=self.line_termination)
+                task_send_command(linked_data[self.stream_id],serial,logger=self.logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
-                    self.log_file.error("Stream %i :  closing script couldn't finish : %e " , self.stream_id , e)
+                self.log_file.error("Stream %i :  closing script couldn't finish : %e " , self.stream_id , e)
             raise ScriptFileException(f"Closeup script couldn't finish {e}") from e
         return 0
 
-    def datalink_tcp_server_task(self):
+    def datalink_tcp_server_task(self, tcp: socket.socket, linked_data: list[queue.Queue], update_linked_ports_queue: queue.Queue 
+                              ,  data_to_show : queue.Queue):
         """
         The task for data link Stream using TCP communication.
 
@@ -649,8 +657,8 @@ class Stream:
         if self.stream is not socket.socket :
             return self._exception_disconnect()
         linked_ports: list[int] = []
-        self.stream.settimeout(0.1)
-        self.stream.setblocking(0)
+        tcp.settimeout(0.1)
+        tcp.setblocking(0)
         temp_incoming_tranfert = 0
         temp_outgoing_tranfert = 0
         # Wait for a client to connect to the server
@@ -659,8 +667,8 @@ class Stream:
             self.log_file.info("Stream %i : waiting for client to connect " , self.stream_id)
         while True:
             try:
-                self.stream.listen()
-                conn, _ = self.stream.accept()
+                tcp.listen()
+                conn, _ = tcp.accept()
                 conn.settimeout(0.1)
                 break
             except TimeoutError as e :
@@ -686,8 +694,8 @@ class Stream:
             temp_incoming_tranfert ,temp_outgoing_tranfert, current_time =  task_data_transfer_rate(self , current_time , temp_incoming_tranfert , temp_outgoing_tranfert)
             try:
                 #If a client is connected
-                if conn is not socket.socket:
-                    #Read input data
+                if conn is not None:
+                    #Read input data 
                     try:
                         incoming_data = conn.recv(4096).decode(encoding='ISO-8859-1')
                         temp_incoming_tranfert += len(incoming_data)
@@ -695,30 +703,34 @@ class Stream:
                             conn = None
                     except socket.timeout:
                         incoming_data = ""
-                    # Print data if show data input
-                    task_show_data(self , incoming_data)
+                    # Print data if show data input 
+                    if self.show_incoming_data.is_set() and len(incoming_data) != 0:
+                        data_to_show.put(incoming_data)
+                        if self.logging:
+                                self.logger.write(incoming_data)
                     # Send input data to linked Streams
-                    task_share_data(linked_ports , self.linked_data , incoming_data )
+                    if linked_ports is not None and len(incoming_data) != 0:
+                        for portid in linked_ports:
+                            linked_data[portid].put(incoming_data)
                             
                     #Send output data comming from other streams and print data if showdata is set
-                    if not self.linked_data[self.stream_id].empty():
-                        returned_value = task_send_command(self.linked_data[self.stream_id] , conn , self.show_outgoing_data.is_set(), data_to_show=self.data_to_show,logger=self.logger,line_termination=self.line_termination)
-                        if returned_value is not None :
-                                temp_outgoing_tranfert += returned_value
-                else :
+                    if not linked_data[self.stream_id].empty():
+                        temp_outgoing_tranfert+= task_send_command(linked_data[self.stream_id] , conn , self.show_outgoing_data.is_set(), data_to_show=data_to_show,logger=self.logger,line_termination=self.line_termination)
+                else : 
                     time.sleep(1)
                     #Wait for a new Client if the current one has disconnect
                     if self.log_file is not None :
-                                self.log_file.info("Stream %i: Client disconnected %e " , self.stream_id , e)
+                                self.log_file.info(f"Stream {self.stream_id} : Client disconnected  {e}")
                     while True:
                         try:
-                            self.stream.listen()
-                            conn, _ = self.stream.accept()
+                           
+                            tcp.listen()
+                            conn, address = tcp.accept()
                             conn.settimeout(0.1)
                             if self.log_file is not None :
-                                self.log_file.info("Stream %i : new Client Connected  %e",self.stream_id , e)
+                                self.log_file.info(f"Stream {self.stream_id} : new Client Connected  {e}")
                             break
-                        except TimeoutError as e:
+                        except Exception as e:
                             if self.stop_event.is_set():
                                 return 0
             except Exception as e:
@@ -741,17 +753,15 @@ class Stream:
                     self.log_file.error("Stream %i :  closing script couldn't finish : %e " , self.stream_id , e)
             raise ScriptFileException(f"Closeup script couldn't finish {e}") from e
         return 0
-
-    def datalink_tcp_client_task(self):
+    
+    def datalink_tcp_client_task(self, tcp: socket.socket, linked_data: list[queue.Queue], update_linked_ports_queue: queue.Queue 
+                              ,  data_to_show : queue.Queue):
         """
         The task for data link Stream using TCP communication.
 
         """
-        if self.stream is not socket.socket :
-            self._exception_disconnect()
-            return 0
         linked_ports: list[int] = []
-        self.stream.settimeout(0.1)
+        tcp.settimeout(0.1)
         conn = 1
         temp_incoming_tranfert = 0
         temp_outgoing_tranfert = 0
@@ -761,10 +771,10 @@ class Stream:
             self.log_file.info("Stream %i : sending startup script" , self.stream_id )
         try:
             if not self.linked_data[self.stream_id].empty():
-                task_send_command(self.linked_data[self.stream_id],self.stream,logger=self.logger,line_termination=self.line_termination)
+                task_send_command(self.linked_data[self.stream_id],tcp,logger=self.logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
-                    self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
+                self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
             self._exception_disconnect()
             raise ScriptFileException(f"Start script couldn't finish {e}") from e
         current_time = datetime.now()
@@ -775,35 +785,39 @@ class Stream:
         while self.stop_event.is_set() is not True:
             temp_incoming_tranfert ,temp_outgoing_tranfert,current_time =  task_data_transfer_rate(self , current_time , temp_incoming_tranfert , temp_outgoing_tranfert)          
             try:
-                #While Connection still up
+                #While Connection still up 
                 if conn  is not None :
-                    #Read input data
+                    #Read input data 
                     try:
-                        incoming_data = self.stream.recv(4096).decode(encoding='ISO-8859-1')
+                        incoming_data = tcp.recv(4096).decode(encoding='ISO-8859-1')
                         temp_incoming_tranfert += len(incoming_data)
                         if len(incoming_data) == 0:
                             conn = None
                     except socket.timeout:
                         incoming_data = ""
-                    except ConnectionResetError :
+                    except ConnectionResetError : 
                         conn = None
-                    except BrokenPipeError :
+                    except BrokenPipeError : 
                         conn = None
-
-                    # Print data if show data input
-                    task_show_data(self , incoming_data)
-                    # Send input data to linked Streams
-                    task_share_data(linked_ports , self.linked_data , incoming_data )
+                    # Print if show data 
+                    if self.show_incoming_data.is_set() and len(incoming_data) != 0:
+                        data_to_show.put(incoming_data)
+                        if self.logging:
+                            self.logger.write(incoming_data)
+                    # Send data to linked stream
+                    if linked_ports is not None and len(incoming_data) != 0:
+                        for portid in linked_ports:
+                            linked_data[portid].put(incoming_data)
                     # Output data comming from other streams
-                    if not self.linked_data[self.stream_id].empty():
-                        returned_value = task_send_command(self.linked_data[self.stream_id],self.stream,self.show_outgoing_data.is_set(),data_to_show=self.data_to_show,logger=self.logger,line_termination=self.line_termination)
-                        if returned_value is not None :
-                            temp_outgoing_tranfert += returned_value
-                else :
+                    if not linked_data[self.stream_id].empty():
+                        returnedValue = task_send_command(linked_data[self.stream_id],tcp,self.show_outgoing_data.is_set(),data_to_show=data_to_show,logger=self.logger,line_termination=self.line_termination)
+                        if returnedValue is not None :
+                            temp_outgoing_tranfert += returnedValue
+                else : 
                     # If connection Lost try to reconnect to the server
                     while True:
                         try:
-                            self.stream = self.tcp_settings.connect()
+                            tcp = self.tcp_settings.connect()
                             conn = 1
                             break
                         except TimeoutError:
@@ -825,14 +839,15 @@ class Stream:
             self.log_file.info("Stream %i : main loop ended ",self.stream_id )
             self.log_file.info("Stream %i : sending closing script" , self.stream_id )
         try : 
-            task_send_command(self.linked_data[self.stream_id],self.stream,logger=self.logger,line_termination=self.line_termination)
+            task_send_command(self.linked_data[self.stream_id],tcp,logger=self.logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
                     self.log_file.error("Stream %i :  closing script couldn't finish : %e " , self.stream_id , e)
             raise ScriptFileException(f"Start script couldn't finish {e}") from e
         return 0
                     
-    def datalink_udp_task(self):
+    def datalink_udp_task(self, udp: socket.socket, linked_data: list[queue.Queue], update_linked_ports_queue: queue.Queue 
+                           , data_to_show : queue.Queue ):
         """
         Task for data link Stream using UDP communication.
         """
@@ -850,7 +865,7 @@ class Stream:
         try:
             if not self.linked_data[self.stream_id].empty():
                 if sendaddress is not None:
-                    task_send_command(self.linked_data[self.stream_id] , stream=self.stream , udp_send_address=sendaddress[0],logger = self.logger,line_termination = self.line_termination)
+                    task_send_command(self.linked_data[self.stream_id] , stream=udp , udp_send_address=sendaddress[0],logger = self.logger,line_termination = self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
                     self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
@@ -865,19 +880,23 @@ class Stream:
             temp_incoming_tranfert ,temp_outgoing_tranfert,current_time =  task_data_transfer_rate(self , current_time , temp_incoming_tranfert , temp_outgoing_tranfert)
             try:
                 #Continue is Stream is still up
-                if self.stream is socket.socket:
+                if udp is not None:
                     if self.udp_settings.dataflow in (1, 2):
-                        bytes_address_pair = self.stream.recvfrom(4096)
-                        incoming_data = bytes_address_pair[0].decode(encoding='ISO-8859-1')
+                        bytesAddressPair = udp.recvfrom(4096)
+                        incoming_data = bytesAddressPair[0].decode(encoding='ISO-8859-1')
                         temp_incoming_tranfert += len(incoming_data)
                         
-                        # Print data if show data input
-                        task_show_data(self , incoming_data)
-                        # Send input data to linked Streams
-                        task_share_data(linked_ports , self.linked_data , incoming_data )
+                        if self.show_incoming_data.is_set() and len(incoming_data) != 0:
+                            data_to_show.put(incoming_data)
+                            if self.logging:
+                                self.logger.write(incoming_data)
+                            
+                        if linked_ports is not None and len(incoming_data) != 0:
+                            for port in linked_ports:
+                                linked_data[port].put(incoming_data)
 
                     if self.udp_settings.dataflow in (0, 2):
-                        if not self.linked_data[self.stream_id].empty():
+                        if not linked_data[self.stream_id].empty():
                             if sendaddress is not None:
                                 returned_value = task_send_command(self.linked_data[self.stream_id] , self.stream , self.show_outgoing_data.is_set() , sendaddress[0], self.data_to_show,logger=self.logger,line_termination=self.line_termination)
                                 if returned_value is not None :
@@ -887,10 +906,10 @@ class Stream:
                 self._exception_disconnect()
                 if self.log_file is not None :
                     self.log_file.error("Stream %i %s has been disconnected, error: %e",self.stream_id , self.stream_type , e )
-                raise StreamThreadException(f"Stream {self.stream_id} {self.stream_type.name} has been disconnected, error: {e}") from e
+                raise StreamThreadException(f"Stream {self.stream_id} {self.stream_type} has been disconnected, error: {e}") from e
             #Update linked Streams list
             if not self.update_linked_ports_queue.empty():
-                task_update_linked_port(self.update_linked_ports,linked_ports)
+                task_update_linked_port(update_linked_ports_queue,linked_ports)
         #Send closeup Commands
         if self.log_file is not None :
             self.log_file.info("Stream %i : main loop ended ",self.stream_id )
@@ -898,14 +917,15 @@ class Stream:
         try : 
             if not self.linked_data[self.stream_id].empty():
                 if sendaddress is not None:
-                    task_send_command(self.linked_data[self.stream_id] ,stream= self.stream  , udp_send_address=sendaddress[0],logger=self.logger,line_termination=self.line_termination)
+                    task_send_command(self.linked_data[self.stream_id] ,stream= udp  , udp_send_address=sendaddress[0],logger=self.logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
-                    self.log_file.error("Stream %i :  closing script couldn't finish : %e " , self.stream_id , e)
+                self.log_file.error("Stream %i :  closing script couldn't finish : %e " , self.stream_id , e)
             raise ScriptFileException(f"Start script couldn't finish {e}") from e
         return 0
-
-    def datalink_ntrip_task(self):
+    
+    def datalink_ntrip_task(self, ntrip : NtripClient, linked_data: list[queue.Queue], update_linked_ports_queue: queue.Queue 
+                           , data_to_show : queue.Queue ):
         """
         Process the NTRIP data received from the NTRIP client and send correction to other the linked streams .
 
@@ -915,10 +935,9 @@ class Stream:
             update_linked_ports (queue.Queue): The queue for updating the linked ports.
         """
         linked_ports: list[int] = []
-        self.stream.socket.settimeout(0.1)
+        ntrip.socket.settimeout(0.1)
         temp_incoming_tranfert = 0
         temp_outgoing_tranfert = 0
-        print("ici")
         # Send startup command
         if self.log_file is not None :
             self.log_file.info("Stream %i : Task Started " , self.stream_id )
@@ -927,7 +946,7 @@ class Stream:
             if self.ntrip_client.ntrip_settings.fixed_pos :
                 self.linked_data[self.stream_id].put(self.ntrip_client.fixed_pos_gga)
             if not self.linked_data[self.stream_id].empty():
-                task_send_command(self.linked_data[self.stream_id],self.stream ,logger=self.logger,line_termination=self.line_termination)
+                task_send_command(self.linked_data[self.stream_id],ntrip ,logger=self.logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
                     self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
@@ -941,30 +960,37 @@ class Stream:
         while self.stop_event.is_set() is not True:
             temp_incoming_tranfert ,temp_outgoing_tranfert,current_time =  task_data_transfer_rate(self , current_time , temp_incoming_tranfert , temp_outgoing_tranfert) 
             try:
-                if self.stream is not None:
-                    print(self.stream)
-                    #Read input data
+                if ntrip is not None:
+                    #Read input data 
                     try:
-                        incoming_data = self.stream.socket.recv(4096).decode(encoding='ISO-8859-1')
+                        incoming_data = ntrip.socket.recv(4096).decode(encoding='ISO-8859-1')
                         temp_incoming_tranfert += len(incoming_data)
                     except socket.timeout:
                         incoming_data = ""
-                    # Print data if show data input
-                    task_show_data(self , incoming_data)
+                    # Print data if show data input 
+                    if self.show_incoming_data.is_set() and len(incoming_data) != 0:
+                        data_to_show.put(incoming_data)
+                        if self.logging:
+                            self.logger.write(incoming_data)
+                        
                     # Send input data to linked Streams
-                    task_share_data(linked_ports , self.linked_data , incoming_data )
+                    if linked_ports is not None and len(incoming_data) != 0:
+                        for portid in linked_ports:
+                            portQueue: queue.Queue = linked_data[portid]
+                            portQueue.put(incoming_data)
                     #Send output data comming from other streams and print data if showdata is set
-                    if not self.linked_data[self.stream_id].empty():
-                        returned_value= task_send_command(self.linked_data[self.stream_id],self.stream ,self.show_outgoing_data.is_set(),data_to_show=self.data_to_show,logger=self.logger,line_termination=self.line_termination)
-                        if returned_value is not None :
-                            temp_outgoing_tranfert += returned_value 
+                    if not linked_data[self.stream_id].empty():
+                        returnedValue = task_send_command(linked_data[self.stream_id],ntrip ,self.show_outgoing_data.is_set(),data_to_show=data_to_show,logger=self.logger,line_termination=self.line_termination)
+                        if returnedValue is not None : 
+                            temp_outgoing_tranfert += returnedValue
             except Exception as e:
                 self._exception_disconnect()
+                if self.log_file is not None :
+                    self.log_file.error("Stream %i %s has been disconnected, error: %e",self.stream_id , self.stream_type , e )
                 raise StreamThreadException(f"Stream {self.stream_id} {self.stream_type} has been disconnected, error: {e}") from e
-
             #Update current linked Streams list
             if not self.update_linked_ports_queue.empty():
-                task_update_linked_port(self.update_linked_ports,linked_ports)
+                task_update_linked_port(update_linked_ports_queue,linked_ports)
         if self.log_file is not None :
             self.log_file.info("Stream %i : main loop ended ",self.stream_id )
             self.log_file.info("Stream %i : sending closing script" , self.stream_id )
@@ -972,7 +998,7 @@ class Stream:
         try :
             if not self.linked_data[self.stream_id].empty():
 
-                task_send_command(self.linked_data[self.stream_id],self.stream,
+                task_send_command(self.linked_data[self.stream_id],ntrip,
                                   logger=self.logger,line_termination=self.line_termination)
 
         except TaskException as e :
@@ -981,6 +1007,45 @@ class Stream:
             raise ScriptFileException(f"Start script couldn't finish {e}") from e
         return 0
 
+    # Command line Configuration Functions 
+
+    
+    def _ExceptionDisconnect(self):
+        """
+        Disconnects the port if is connected in case of a exception caused in the task Thread
+        """
+        if self.log_file is not None : 
+            self.log_file.info("Stream %s : Disconnecting stream due to error in task")
+        self.stop_event.set()
+        self.current_task = None
+        try :
+            self.stream.close()
+        finally:
+            self.connected = False  
+            self.data_transfer_input = 0.0
+            self.data_transfer_output = 0.0
+    
+    def _clearQueue(self, queue : queue.Queue):
+        """
+        clear the queue passed as argument
+        Args:
+            queue (queue.Queue): queue to empty
+        """
+        while not queue.empty():
+            queue.get()
+            
+    def task_data_transfer_rate(self , current_time  , temp_incoming_tranfert , temp_outgoing_tranfert) :
+        """
+        Calculate current data rate from incoming and outgoing stream
+        """
+        now = datetime.now()
+        if (now-current_time).total_seconds() >=  1 :
+            current_time = now
+            self.data_transfer_input = round(temp_incoming_tranfert/1000,1)
+            self.data_transfer_output = round(temp_outgoing_tranfert/1000,1)
+            return 0 , 0 , current_time
+        else :
+            return temp_incoming_tranfert , temp_outgoing_tranfert ,current_time
 #####################################################################################
 # STREAM TASK
 #####################################################################################
@@ -1004,21 +1069,22 @@ def task_send_command(linked_data : queue.Queue , stream  : Serial | socket.sock
     output data from data queue
     """
     try :
+        
         for _ in range(linked_data.qsize()):
             outgoing_data : str = linked_data.get()
+            
             if isinstance(stream , Serial):
                 stream.write((outgoing_data+"\n").encode(encoding='ISO-8859-1'))
-            elif isinstance(Stream, socket.socket) and udp_send_address is None: 
-                stream.sendall((outgoing_data + line_termination).encode(encoding='ISO-8859-1'))
-            elif isinstance(Stream, socket.socket) :
-                stream.sendto((outgoing_data + line_termination).encode(encoding='ISO-8859-1'), udp_send_address)
-            elif isinstance(Stream, NtripClient):
-                if "GPGGA" in outgoing_data:
+            elif isinstance(stream, socket.socket) and udp_send_address is None:
+                stream.sendall(outgoing_data.encode(encoding='ISO-8859-1'))
+            elif isinstance(stream, socket.socket) :
+                stream.sendto(outgoing_data.encode(encoding='ISO-8859-1'), udp_send_address)
+            elif isinstance(stream, NtripClient):
+                if "GGA" in outgoing_data:
                     stream.send_nmea(outgoing_data)
             else : continue
             if show_data and len(outgoing_data) != 0 :
-                data_to_show.put(outgoing_data)
-                try : 
+                try :
                     if logger is not None:
                         logger.write(outgoing_data)
                 except : pass
@@ -1027,38 +1093,16 @@ def task_send_command(linked_data : queue.Queue , stream  : Serial | socket.sock
         raise TaskException(e) from e
     
 
-
-def task_share_data(linked_ports : list[int] , linked_data : list[queue.Queue] , incoming_data ) :
-    """
-    linked_ports : list of linked port stream_id 
-    linked_data : list of stream queue
-    incoming_data : Data to share 
-    """
-    if linked_ports is not None and len(incoming_data) != 0:
-        for portid in linked_ports:
-            port_queue: queue.Queue = linked_data[portid]
-            port_queue.put(incoming_data)
-
-def task_show_data(stream :Stream , data) :
-    """
-    put in show data queue and log the data if wanted
-    """
-    if stream.show_incoming_data.is_set() and len(data) != 0:
-        print("show data")
-        stream.data_to_show.put(data)
-        if stream.logging:
-            stream.logger.write(data)
-
 def task_data_transfer_rate(stream :Stream , current_time  , temp_incoming_tranfert , temp_outgoing_tranfert) :
     """
     Calculate current data rate from incoming and outgoing stream
     """
     now = datetime.now()
     if (now-current_time).total_seconds() >=  1 :
-        print("calcule transfert rate")
         current_time = now 
         stream.data_transfer_input = round(temp_incoming_tranfert/1000,1)
         stream.data_transfer_output = round(temp_outgoing_tranfert/1000,1)
         return 0 , 0 , current_time
     else :
-        return temp_incoming_tranfert , temp_outgoing_tranfert ,current_time
+        return temp_incoming_tranfert , temp_outgoing_tranfert ,current_time 
+ 

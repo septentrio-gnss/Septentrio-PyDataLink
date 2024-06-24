@@ -64,7 +64,7 @@ def check_data_folder():
         os.mkdir(CONFIGPATH )
     if os.path.exists( LOGFILESPATH ) is not True:
         os.mkdir(LOGFILESPATH )
-    else : 
+    else :
         clean_log_folder()
 
 class DatalinkApp:
