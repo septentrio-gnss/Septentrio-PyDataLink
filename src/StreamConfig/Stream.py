@@ -179,7 +179,7 @@ class Stream:
                         self.connected = True
                         task = self.datalink_serial_task
                         if self.log_file is not None :
-                            self.log_file.info("Stream %s : Stream openned succesfully " , self.stream_id)
+                            self.log_file.info("Stream %s : Stream openned successfully " , self.stream_id)
                     except SerialSettingsException as e:
                         if self.log_file is not None :
                             self.log_file.error("Stream %s : Failed to connect to the serial port : %s" , self.stream_id,e)
@@ -204,7 +204,7 @@ class Stream:
                         else :
                             task = self.datalink_tcp_client_task
                         if self.log_file is not None :
-                            self.log_file.info("Stream %s : Stream openned succesfully " , self.stream_id)
+                            self.log_file.info("Stream %s : Stream openned successfully " , self.stream_id)
                     except TCPSettingsException as e :
                         self.stream = None
                         self.connected = False
@@ -219,11 +219,12 @@ class Stream:
                     raise MissingSettingsException("udp settings are empty!")
                 else:
                     try:
+                        self.connected = True
                         socket.gethostbyname(self.tcp_settings.host)
                         self.stream = self.udp_settings.connect()
                         task = self.datalink_udp_task
                         if self.log_file is not None :
-                            self.log_file.info("Stream %s : Stream openned succesfully " , self.stream_id)
+                            self.log_file.info("Stream %s : Stream openned successfully " , self.stream_id)
                     except UDPSettingsException as e:
                         self.stream = None
                         self.connected = False
@@ -247,7 +248,7 @@ class Stream:
                             self.ntrip_client.create_gga_string()
 
                         if self.log_file is not None :
-                            self.log_file.info("Stream %s : Stream openned succesfully " , self.stream_id)
+                            self.log_file.info("Stream %s : Stream openned successfully " , self.stream_id)
                     except (NtripClientError,NtripSettingsException) as e:
                         self.stream = None
                         self.connected = False 
@@ -854,10 +855,12 @@ class Stream:
         linked_ports = []
         temp_incoming_tranfert = 0
         temp_outgoing_tranfert = 0
+        bytes_address_pair = None
+        udp.settimeout(0.1)
         if self.udp_settings.specific_host is True:
             sendaddress = (self.udp_settings.host, self.udp_settings.port)
         else:
-            sendaddress = ('', self.udp_settings.port)
+            sendaddress = ('localhost', self.udp_settings.port)
         #Send Startup command
         if self.log_file is not None :
             self.log_file.info("Stream %i : Task Started " , self.stream_id )
@@ -865,10 +868,10 @@ class Stream:
         try:
             if not self.linked_data[self.stream_id].empty():
                 if sendaddress is not None:
-                    task_send_command(self.linked_data[self.stream_id] , stream=udp , udp_send_address=sendaddress[0],logger = self.logger,line_termination = self.line_termination)
+                    task_send_command(self.linked_data[self.stream_id] , stream=udp , udp_send_address=sendaddress,logger = self.logger,line_termination = self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
-                    self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
+                self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
             self._exception_disconnect()
             raise ScriptFileException(f"Start script couldn't finish {e}") from e
         current_time = datetime.now()
@@ -881,27 +884,31 @@ class Stream:
             try:
                 #Continue is Stream is still up
                 if udp is not None:
-                    if self.udp_settings.dataflow in (1, 2):
-                        bytesAddressPair = udp.recvfrom(4096)
-                        incoming_data = bytesAddressPair[0].decode(encoding='ISO-8859-1')
-                        temp_incoming_tranfert += len(incoming_data)
-                        
+                    if self.udp_settings.dataflow.value in (1, 2):
+                        try :
+                            bytes_address_pair = udp.recvfrom(4096)
+                            incoming_data = bytes_address_pair[0].decode(encoding='ISO-8859-1')
+                            temp_incoming_tranfert += len(incoming_data)
+                        except socket.timeout :
+                            incoming_data = ""
                         if self.show_incoming_data.is_set() and len(incoming_data) != 0:
                             data_to_show.put(incoming_data)
                             if self.logging:
                                 self.logger.write(incoming_data)
-                            
+
                         if linked_ports is not None and len(incoming_data) != 0:
                             for port in linked_ports:
                                 linked_data[port].put(incoming_data)
 
-                    if self.udp_settings.dataflow in (0, 2):
+                    if self.udp_settings.dataflow.value in (0, 2):
                         if not linked_data[self.stream_id].empty():
-                            if sendaddress is not None:
-                                returned_value = task_send_command(self.linked_data[self.stream_id] , self.stream , self.show_outgoing_data.is_set() , sendaddress[0], self.data_to_show,logger=self.logger,line_termination=self.line_termination)
+                            if bytes_address_pair is not None:
+                                send_to_addresse = (bytes_address_pair[1],self.udp_settings.port)
+                            else :
+                                send_to_addresse = sendaddress
+                                returned_value = task_send_command(self.linked_data[self.stream_id] , stream=self.stream , show_data=self.show_outgoing_data.is_set() , udp_send_address=send_to_addresse , data_to_show=self.data_to_show,logger=self.logger,line_termination=self.line_termination)
                                 if returned_value is not None :
                                     temp_outgoing_tranfert += returned_value
-            
             except Exception as e:
                 self._exception_disconnect()
                 if self.log_file is not None :
@@ -917,7 +924,7 @@ class Stream:
         try : 
             if not self.linked_data[self.stream_id].empty():
                 if sendaddress is not None:
-                    task_send_command(self.linked_data[self.stream_id] ,stream= udp  , udp_send_address=sendaddress[0],logger=self.logger,line_termination=self.line_termination)
+                    task_send_command(self.linked_data[self.stream_id] ,stream= udp  , udp_send_address=sendaddress,logger=self.logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
                 self.log_file.error("Stream %i :  closing script couldn't finish : %e " , self.stream_id , e)
@@ -1063,27 +1070,26 @@ def task_update_linked_port(update_linked_ports_queue : queue.Queue , linked_por
     return linked_ports
 
 def task_send_command(linked_data : queue.Queue , stream  : Serial | socket.socket | NtripClient, show_data : bool = False ,
-                      udp_send_address : str = None, data_to_show : queue.Queue = None ,
+                      udp_send_address = None ,  data_to_show : queue.Queue = None ,
                       logger : TextIOWrapper = None , line_termination : str = "\r\n"):
     """
     output data from data queue
     """
     try :
-        
         for _ in range(linked_data.qsize()):
             outgoing_data : str = linked_data.get()
-            
             if isinstance(stream , Serial):
-                stream.write((outgoing_data+"\n").encode(encoding='ISO-8859-1'))
+                stream.write((outgoing_data+line_termination).encode(encoding='ISO-8859-1'))
             elif isinstance(stream, socket.socket) and udp_send_address is None:
-                stream.sendall(outgoing_data.encode(encoding='ISO-8859-1'))
+                stream.sendall(outgoing_data.encode(encoding='ISO-8859-1')+ line_termination)
             elif isinstance(stream, socket.socket) :
-                stream.sendto(outgoing_data.encode(encoding='ISO-8859-1'), udp_send_address)
+                stream.sendto(outgoing_data.encode(encoding='ISO-8859-1') + line_termination, udp_send_address)
             elif isinstance(stream, NtripClient):
                 if "GGA" in outgoing_data:
                     stream.send_nmea(outgoing_data)
             else : continue
             if show_data and len(outgoing_data) != 0 :
+                data_to_show.put(outgoing_data)
                 try :
                     if logger is not None:
                         logger.write(outgoing_data)

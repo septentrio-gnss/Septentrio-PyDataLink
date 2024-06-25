@@ -37,19 +37,18 @@ if getattr(sys, 'frozen', False):
 else:
     PROJECTPATH = os.path.abspath(os.path.dirname(__file__)).replace("\\src","") #Path to the project folder
     DATAFILESPATH = os.path.join(PROJECTPATH , "src" , "Data Files" )
-    
+
 APPNAME = "PyDataLink"
 MAINSCRIPTPATH = os.path.join(PROJECTPATH , "pyDatalink.py")
-
+MAXFILENUMBER = 20
 DATAPATH = os.path.join(os.path.expanduser("~") , ".septentrio") # Path to the PyDataLink Data Folder
 CONFIGPATH = os.path.join(DATAPATH , "confs" )   # Path to the Configuration folder
 LOGFILESPATH =  os.path.join(DATAPATH ,"logs")   # Path to the Logs folder
 DEFAULTCONFIGFILE = os.path.join(CONFIGPATH ,"pydatalink.conf")  # Path to the default configuration file
 
+# Create logging file for the app
 now = datetime.datetime.now()
-filename = now.strftime("pyDatalink_%Y-%m-%d_%H-%M-%S.log")
-
-DEFAULTLOGFILEPATH = LOGFILESPATH + "\\" + filename # Path to the log file
-
-DEFAULTLOGFILELOGGER = logging.getLogger("PyDatalink")
+filename = now.strftime("pyDatalink_%Y-%m-%d_%H-%M.log")
+DEFAULTLOGFILEPATH = LOGFILESPATH + "\\" + filename
 logging.basicConfig(filename= DEFAULTLOGFILEPATH, encoding='utf-8', level=logging.DEBUG, format='[%(asctime)s] %(levelname)s : %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
+DEFAULTLOGFILELOGGER = logging.getLogger("PyDatalink")
