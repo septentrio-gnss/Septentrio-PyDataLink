@@ -51,7 +51,6 @@ from src.UserInterfaces.CommandLineInterface import CommandLineInterface
 
 def clean_log_folder():
     files = [os.path.join(LOGFILESPATH, f) for f in os.listdir(LOGFILESPATH) if os.path.isfile(os.path.join(LOGFILESPATH, f))]
-    print(len(files))
     while len(files) > MAXFILENUMBER:
         oldest_file = min(files, key=os.path.getctime)
         os.remove(oldest_file)

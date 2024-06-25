@@ -251,7 +251,7 @@ class Stream:
                             self.log_file.info("Stream %s : Stream openned successfully " , self.stream_id)
                     except (NtripClientError,NtripSettingsException) as e:
                         self.stream = None
-                        self.connected = False 
+                        self.connected = False
                         if self.log_file is not None :
                             self.log_file.error("Stream %s : Failed to open NTRIP stream: %s" , self.stream_id,e)
                         raise OpenConnectionError(f"Failed to open NTRIP Stream : {e}") from e
@@ -655,8 +655,6 @@ class Stream:
         The task for data link Stream using TCP communication.
 
         """
-        if self.stream is not socket.socket :
-            return self._exception_disconnect()
         linked_ports: list[int] = []
         tcp.settimeout(0.1)
         tcp.setblocking(0)
@@ -672,9 +670,9 @@ class Stream:
                 conn, _ = tcp.accept()
                 conn.settimeout(0.1)
                 break
-            except TimeoutError as e :
+            except (TimeoutError , BlockingIOError) :
                 if self.stop_event.is_set():
-                    return e
+                    return self._exception_disconnect()
         # Send startup command
         if self.log_file is not None :
             self.log_file.info("Stream %i : sending startup script" , self.stream_id )
@@ -683,7 +681,7 @@ class Stream:
                 task_send_command(self.linked_data[self.stream_id],conn,logger=self.logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
-                    self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
+                self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
             self._exception_disconnect()
             raise ScriptFileException(f"Start script couldn't finish {e}") from e
         current_time = datetime.now()
@@ -717,7 +715,7 @@ class Stream:
                     #Send output data comming from other streams and print data if showdata is set
                     if not linked_data[self.stream_id].empty():
                         temp_outgoing_tranfert+= task_send_command(linked_data[self.stream_id] , conn , self.show_outgoing_data.is_set(), data_to_show=data_to_show,logger=self.logger,line_termination=self.line_termination)
-                else : 
+                else :
                     time.sleep(1)
                     #Wait for a new Client if the current one has disconnect
                     if self.log_file is not None :
@@ -731,17 +729,17 @@ class Stream:
                             if self.log_file is not None :
                                 self.log_file.info(f"Stream {self.stream_id} : new Client Connected  {e}")
                             break
-                        except Exception as e:
+                        except Exception as e :
                             if self.stop_event.is_set():
-                                return 0
+                                raise e 
             except Exception as e:
                 self._exception_disconnect()
                 if self.log_file is not None :
                     self.log_file.error("Stream %i %s has been disconnected, error: %e",self.stream_id , self.stream_type , e )
                 raise StreamThreadException(f"Stream {self.stream_id} {self.stream_type} has been disconnected, error: {e}") from e
             #Update current linked Streams list
-            if not self.update_linked_ports_queue.empty():
-                linked_ports = task_update_linked_port(self.update_linked_ports , linked_ports)
+            if not update_linked_ports_queue.empty():
+                linked_ports = task_update_linked_port(update_linked_ports_queue , linked_ports)
         #Send closeup commands
         if self.log_file is not None :
             self.log_file.info("Stream %i : main loop ended ",self.stream_id )
