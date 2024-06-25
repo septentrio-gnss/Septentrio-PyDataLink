@@ -1,21 +1,21 @@
 # ###############################################################################
-# 
+#
 # Copyright (c) 2024, Septentrio
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
-# 
+#
 # 1. Redistributions of source code must retain the above copyright notice, this
 #    list of conditions and the following disclaimer.
-# 
+#
 # 2. Redistributions in binary form must reproduce the above copyright notice,
 #    this list of conditions and the following disclaimer in the documentation
 #    and/or other materials provided with the distribution.
-# 
+#
 # 3. Neither the name of the copyright holder nor the names of its
 #    contributors may be used to endorse or promote products derived from
 #    this software without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -27,10 +27,18 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import configparser
-from enum import Enum
 import socket
 import logging
+from enum import Enum
+from ..constants import DEFAULTLOGFILELOGGER
+
+class UDPSettingsException(Exception):
+    """
+        Exception class for udp settings 
+    """
+    def __init__(self, message, error_code = None):
+        super().__init__(message)
+        self.error_code = error_code
 
 class DataFlow(Enum):
     """
@@ -38,11 +46,10 @@ class DataFlow(Enum):
     """
     OnlyTransmit = 0
     OnlyListen = 1
-    Both  = 2
-   
+    BOTH  = 2
 
 
-class UdpSettings: 
+class UdpSettings:
     """
     Represents the UDP settings for a Stream.
     
@@ -51,10 +58,10 @@ class UdpSettings:
         port (int): The port number to connect to. Default is 28784.
         DataFlow (DataFlow): The data flow mode. Default is DataFlow.Both.
         socket (socket): The socket object used for the Stream.
-        specificHost (str): The specific host IP address to bind to.
+        specific_host (str): The specific host IP address to bind to.
     """
 
-    def __init__(self , host : str =  "localhost", port : int = 28784 , dataflow : DataFlow = DataFlow.Both , specificHost : bool = False , logFile : logging =None) -> None:
+    def __init__(self , host : str =  "localhost", port : int = 28784 , dataflow : DataFlow = DataFlow.BOTH , specific_host : bool = False , debug_logging : bool =None) -> None:
         """
         Initializes a new instance of the UDPSettings class.
         
@@ -64,10 +71,12 @@ class UdpSettings:
         """
         self.host : str = host
         self.port : int = port
-        self.DataFlow : DataFlow = dataflow
-        self.specificHost : bool  = specificHost
-        self.logFile : logging = logFile
-
+        self.dataflow : DataFlow = dataflow
+        self.specific_host : bool  = specific_host
+        if debug_logging :
+            self.log_file : logging.Logger = DEFAULTLOGFILELOGGER
+        else : 
+            self.log_file = None
 
 
     def connect(self) -> socket.socket:
@@ -80,68 +89,57 @@ class UdpSettings:
         Raises:
             socket.error: If there is an error while connecting.
         """
-        try : 
+        try :
             newsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             newsocket.settimeout(5)
         except socket.error as e :
-            if self.logFile is not None : 
-                self.logFile.error("Failed to create socket : %s" , e)
-            raise e 
-        try : 
-            if self.specificHost is False:
+            if self.log_file is not None :
+                self.log_file.error("Failed to create socket : %s" , e)
+            raise UDPSettingsException(e) from e
+        try :
+            if self.specific_host is False:
                 newsocket.bind(('', self.port))
             return newsocket
         except socket.error as e :
-            if self.logFile is not None : 
-                self.logFile.error("Failed to create UDP server : %s" ,e)
-            raise e
+            if self.log_file is not None :
+                self.log_file.error("Failed to create UDP server : %s" ,e)
+            raise UDPSettingsException(e) from e
 
 
-    def setHost(self, NewHost : str):
+    def set_host(self, new_host : str):
         """
         Sets the host IP address.
         
         Args:
-            NewHost (str): The new host IP address.
+            new_host (str): The new host IP address.
         """
-        self.host = NewHost
+        self.host = new_host
 
-    def setPort(self, NewPort : int):
+    def set_port(self, new_port : int):
         """
         Sets the port number.
         
         Args:
-            NewPort (int): The new port number.
+            new_port (int): The new port number.
         """
-        self.port = NewPort
-        
-    def set_DataFlow(self, NewDataFlow : DataFlow):
+        self.port = new_port
+
+    def set_dataflow(self, new_dataflow : DataFlow):
         """
         Sets the Data flow.
         
         Args:
-            NewDataFlow (DataFlow): The new Data Flow.
-        """        
-        self.DataFlow = NewDataFlow
-        
-        
-    def toString(self) -> str : 
+            new_Dataflow (DataFlow): The new Data Flow.
+        """
+        self.dataflow = new_dataflow
+
+    def to_string(self) -> str :
         """
         Return current class as a string
 
         Returns:
             str: class as string
         """
-        return f" Host : {self.host} \n Port : {self.port} \n SpecificHost : {self.specificHost} \n DataFlow : {self.DataFlow.name}\n"
+        return f" Host : {self.host} \n Port : {self.port} \n SpecificHost : {self.specific_host} \n DataFlow : {self.dataflow.name}\n"
    
-    def SaveConfig(self , sectionName : str,SaveConfigFile  : configparser.ConfigParser):
-        """
-            Add current class values in the configFile
-        Args:
-            sectionName (str): name of the current section
-            SaveConfigFile (configparser.ConfigParser): configparser of the configuration file
-        """
-        SaveConfigFile.set(sectionName,"hostNameUDP", self.host )
-        SaveConfigFile.set(sectionName,"portNumberUDP",str(self.port))
-        SaveConfigFile.set(sectionName,"specificIpUDP",str(self.specificHost))
-        SaveConfigFile.set(sectionName,"dataDirUDP",str(self.DataFlow.value))
+    

@@ -30,53 +30,59 @@
 
 import threading
 import time
-from ..StreamConfig import *
 
-class CommandLineInterface: 
-    def __init__(self,streams : Streams , showdataId : int = None) -> None:
-        self.Streams = streams
-        self.showdataid = showdataId
+from src.StreamConfig import App
+from src.StreamConfig.Stream import Stream
 
-    def print(self, message):
-        print(message)
+class CommandLineInterface:
+    def __init__(self,app : App , show_data_id : int = None) -> None:
+        self.app = app
+        self.show_data_id = show_data_id
 
     def run(self):
-        if len(self.Streams.StreamList) == 0 : 
+        """Start the thread
+        """
+        if len(self.app.stream_list) == 0 :
             return 0
-        else : 
-            if self.showdataid is not None: 
+        else :
+            if self.show_data_id is not None:
                 target = self._showDataTask
+                show_data_port = self.app.stream_list[self.show_data_id]
             else :
                 target = self._showDataTransfert
-                self.showDataPort = self.Streams
-                
-            stopShowDataEvent = threading.Event()
-            stopShowDataEvent.clear()
-            showDataThread = threading.Thread(target=target , args=(stopShowDataEvent , self.showDataPort,))
-            showDataThread.start()
+                show_data_port = self.app
+
+            stop_show_data_event = threading.Event()
+            stop_show_data_event.clear()
+            show_data_thread = threading.Thread(target=target ,args=(stop_show_data_event , show_data_port,))
+            show_data_thread.start()
             input("Press Enter to close the program \n")
-            stopShowDataEvent.set()
-            showDataThread.join()
-            self.Streams.CloseAll()
-    
-    
-    def _showDataTask(self,stopShowDataEvent, selectedPort : PortConfig):
-        while stopShowDataEvent.is_set() is False:
-            if selectedPort.DataToShow.empty() is False :
-                print(selectedPort.DataToShow.get())
+            stop_show_data_event.set()
+            show_data_thread.join()
+            self.app.close_all()
+
+
+    def _showDataTask(self,stop_show_data_event, selected_port : Stream):
+        """Show all the data of a specific stream
+        """
+        while stop_show_data_event.is_set() is False:
+            if selected_port.data_to_show.empty() is False :
+                print(selected_port.data_to_show.get())
         return 0
-    
-    def _showDataTransfert(self,stopShowDataEvent, stream : Streams):
+
+    def _showDataTransfert(self,stop_show_data_event, app : App):
+        """Show the data transfert rate on all the configured stream
+        """
         speed = "\r"
-        while stopShowDataEvent.is_set() is False:
+        while stop_show_data_event.is_set() is False:
             time.sleep(1)
             speed = "\r"
-            for port in stream.StreamList:
-                speed += "Port "+ str(port.id) +" : in "+ str(port.dataTransferInput) + " kBps ; out "+ str(port.dataTransferOutput) + " kBps "
-            print(speed, end="\r")    
+            for port in app.stream_list:
+                speed += "Port "+ str(port.stream_id) +" : in "+ str(port.data_transfer_input) + " kBps ; out "+ str(port.data_transfer_output) + " kBps "
+            print(speed, end="\r") 
         return 0
-        
-    
+
+
 
     
     

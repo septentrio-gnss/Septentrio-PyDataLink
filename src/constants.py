@@ -26,19 +26,29 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-import os 
+import logging
+import os
 import datetime
- 
+import sys
+
+if getattr(sys, 'frozen', False):
+    PROJECTPATH = sys._MEIPASS
+    DATAFILESPATH = os.path.join(PROJECTPATH, "data" )
+else:
+    PROJECTPATH = os.path.abspath(os.path.dirname(__file__)).replace("\\src","") #Path to the project folder
+    DATAFILESPATH = os.path.join(PROJECTPATH , "src" , "Data Files" )
+
 APPNAME = "PyDataLink"
-PROJECTPATH = os.path.abspath(os.path.dirname(__file__)) #Path to the project folder
-MAINSCRIPTPATH = PROJECTPATH + "pyDatalink.py"
-DATAFILESPATH = PROJECTPATH + "/Data Files/"
-DATAPATH = os.path.expanduser("~") + "/.septentrio" # Path to the PyDataLink Data Folder
-CONFIGPATH = DATAPATH + "/confs"    # Path to the Configuration folder
-LOGFILESPATH = DATAPATH + "/logs"   # Path to the Logs folder
-DEFAULTCONFIGFILE = CONFIGPATH + "/pydatalink.conf"  # Path to the default configuration file
+MAINSCRIPTPATH = os.path.join(PROJECTPATH , "pyDatalink.py")
+MAXFILENUMBER = 20
+DATAPATH = os.path.join(os.path.expanduser("~") , ".septentrio") # Path to the PyDataLink Data Folder
+CONFIGPATH = os.path.join(DATAPATH , "confs" )   # Path to the Configuration folder
+LOGFILESPATH =  os.path.join(DATAPATH ,"logs")   # Path to the Logs folder
+DEFAULTCONFIGFILE = os.path.join(CONFIGPATH ,"pydatalink.conf")  # Path to the default configuration file
 
+# Create logging file for the app
 now = datetime.datetime.now()
-filename = now.strftime("pyDatalink_%Y-%m-%d_%H-%M-%S.log")
-
-DEFAULTLOGFILE = LOGFILESPATH + "/" + filename # Path to the log file
+filename = now.strftime("pyDatalink_%Y-%m-%d_%H-%M.log")
+DEFAULTLOGFILEPATH = LOGFILESPATH + "\\" + filename
+logging.basicConfig(filename= DEFAULTLOGFILEPATH, encoding='utf-8', level=logging.DEBUG, format='[%(asctime)s] %(levelname)s : %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
+DEFAULTLOGFILELOGGER = logging.getLogger("PyDatalink")

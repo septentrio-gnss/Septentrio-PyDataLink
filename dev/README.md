@@ -39,7 +39,7 @@ yes , The very purpose of this project is to remake a version of pydatalink with
 # What is pyDatalink
 
 <div align="center">
-<img src="doc_sources/pyDatalink.PNG" width="75%">
+<img src="doc_sources/pyDatalink.PNG" >
 </div>
 
 <br>
@@ -164,8 +164,8 @@ Once you've installed python, all you have to do is download the source code and
 
 ### Using git clone
 ```
-git clone https://github.com/septentrio-gnss/DataLink.git
-cd DataLink
+git clone https://github.com/septentrio-gnss/Septentrio-PyDataLink.git
+cd Septentrio-PyDataLink
 ```
 ### using GitHub
  - First click on **code**.<br>
@@ -184,7 +184,7 @@ pip install -r requirements.txt
 
 By default pyDatalink run as a Graphical interface
 ```
-python pyDatalinkApp.py
+python pyDatalink.py
 ```
 
 # User Manual

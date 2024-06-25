@@ -52,7 +52,7 @@ Pydatalink is an application whose functions are similar to RxTools' Datalink, b
 
 The second major feature of this version is that the code is entirely open source, unlike the Datalink code. The aim of making the project available as open source is to allow the community to contribute to the development of the tool in order to integrate new functionalities.
 <div align="center">
-<img src="doc_sources/pyDatalink.PNG" width="75%">
+<img src="doc_sources/pyDatalink.PNG" >
 </div>
 <br>
 
@@ -84,28 +84,19 @@ Once you've installed python, all you have to do is download the source code and
 
 ### Using git clone
 ```
-git clone https://github.com/septentrio-gnss/DataLink.git
-cd DataLink
+git clone https://github.com/septentrio-gnss/Septentrio-PyDataLink.git
+cd Septentrio-PyDataLink
 ```
 ### using GitHub
  - First click on **code**.<br>
  - Then click on **dowload Zip**
-### (Optional) Create a Virtual environement
-This will allow you to create a contained workspace where every python package will be installed
-```
-python -m venv venv
-source venv/bin/activate
-```
-### Install Python packages 
-```
-pip install -r requirements.txt
-```
-### Run pyDatalink 
 
-By default pyDatalink run as a Graphical interface
+## Build the project 
+to build and generate the executable file  , run the folowing command
 ```
-python pyDatalinkApp.py
+python build.py
 ```
+After the build is successfully completed , a executable file will be generated 
 
 <br>
 

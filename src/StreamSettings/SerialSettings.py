@@ -1,21 +1,21 @@
 # ###############################################################################
-# 
+#
 # Copyright (c) 2024, Septentrio
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
-# 
+#
 # 1. Redistributions of source code must retain the above copyright notice, this
 #    list of conditions and the following disclaimer.
-# 
+#
 # 2. Redistributions in binary form must reproduce the above copyright notice,
 #    this list of conditions and the following disclaimer in the documentation
 #    and/or other materials provided with the distribution.
-# 
+#
 # 3. Neither the name of the copyright holder nor the names of its
 #    contributors may be used to endorse or promote products derived from
 #    this software without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -27,13 +27,30 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import configparser
 from enum import Enum
 import logging
 from serial import Serial
 import serial.tools.list_ports
+from serial.serialutil import SerialException
+
+from src.constants import DEFAULTLOGFILELOGGER
+
+class SerialSettingsException(Exception):
+    """
+        Exception class for Serial settings 
+    """
+    def __init__(self, message, error_code = None):
+        super().__init__(message)
+        self.error_code = error_code
+class PortInUseException(SerialSettingsException):
+    """Raised when the given serial port is already in use
+    """
+class PortNotFound(SerialSettingsException):
+    """Raised when the port is not found
+    """
 
 class BaudRate(Enum):
+    """ Baudrate of a Serial port   """
     eBAUD300 =  "300"
     eBAUD600 = "600"
     eBAUD1200 = "1200"
@@ -58,6 +75,7 @@ class BaudRate(Enum):
     eBAUD4000000 = "4000000"
 
 class Parity(Enum):
+    """ Parity of a Serial port   """
     PARITY_NONE = 'N'
     PARITY_EVEN = 'E'
     PARITY_ODD = 'O'
@@ -65,11 +83,13 @@ class Parity(Enum):
     PARITY_SPACE= 'S'
 
 class StopBits(Enum):
+    """ StopBits of a Serial port   """
     STOPBITS_ONE = 1
     STOPBITS_ONE_POINT_FIVE= 1.5
     STOPBITS_TWO = 2
 
 class ByteSize(Enum):
+    """ Bytesize of a Serial port   """
     FIVEBITS = 5
     SIXBITS = 6
     SEVENBITS = 7
@@ -82,25 +102,29 @@ class SerialSettings:
 
     """
 
-    def __init__(self, Port: str = "", baudrate: BaudRate = BaudRate.eBAUD115200, parity: Parity = Parity.PARITY_NONE,
-                 stopbits: StopBits = StopBits.STOPBITS_ONE, bytesize: ByteSize = ByteSize.EIGHTBITS,
-                 Rtscts: bool = False , logFile : logging = None):
+    def __init__(self, port: str = "", baudrate: BaudRate = BaudRate.eBAUD115200,
+                 parity: Parity = Parity.PARITY_NONE,stopbits: StopBits = StopBits.STOPBITS_ONE,
+                 bytesize: ByteSize = ByteSize.EIGHTBITS,
+                 rtscts: bool = False , debug_logging : bool = False):
         """
         Initializes a new instance of the SerialSettings class.
         
         """
-        self.port :str = Port
+        self.port :str = port
         self.baudrate : BaudRate = baudrate
         self.parity : Parity  = parity
         self.stopbits : StopBits = stopbits
         self.bytesize : ByteSize = bytesize
-        self.rtscts : bool= Rtscts
-                                             
-        # Support Logging file 
-        self.logFile : logging = logFile    
+        self.rtscts : bool= rtscts
+
+        # Support Logging file
+        if debug_logging :
+            self.log_file : logging.Logger = DEFAULTLOGFILELOGGER
+        else :
+            self.log_file = None  # type: ignore
 
 
-    def GetAvailablePort(self)-> list :
+    def get_available_port(self)-> list :
         """
         Gets the list of available ports.
 
@@ -108,14 +132,14 @@ class SerialSettings:
             list: The list of available ports.
         """
         ports = serial.tools.list_ports.comports()
-        availablePort = []
-        for port, desc, hwid in sorted(ports):
-            availablePort.append([port, desc])
-        if self.logFile is not None : 
-            self.logFile.debug("%s serial port detected" , str(len(availablePort)))
-        return availablePort
+        available_port = []
+        for port, desc, _ in sorted(ports):
+            available_port.append([port, desc])
+        if self.log_file is not None :
+            self.log_file.debug("%s serial port detected" , str(len(available_port)))
+        return available_port
 
-    def Connect(self) -> Serial | None : 
+    def connect(self) -> Serial | None :
         """
         Connects to the serial port.
 
@@ -123,22 +147,29 @@ class SerialSettings:
             Serial: The serial port object.
         """
         try:
-            newSerial = Serial(None, baudrate=self.baudrate.value, bytesize=self.bytesize.value,
-                          parity=self.parity.value, stopbits=self.stopbits.value, rtscts=self.rtscts, timeout=0.01,exclusive=True)
-            newSerial.port = self.port
-            newSerial.open()
-            return newSerial
-        except Exception as e:
-            if e.args[0] == 11 : 
-                if self.logFile is not None :
-                    self.logFile.error("Port %s is already in use" ,self.port )
-                raise Exception ("PortError","Port already in use")
+            new_serial = Serial(None, baudrate=int(self.baudrate.value),
+                                bytesize=self.bytesize.value,parity=self.parity.value,
+                                stopbits=self.stopbits.value, rtscts=self.rtscts,
+                                timeout=0.01,exclusive=True)
+            new_serial.port = self.port
+            new_serial.open()
+            return new_serial
+        except SerialException as e:
+            if e.args[0] == 11 or "PermissionError" in e.args[0]:
+                if self.log_file is not None :
+                    self.log_file.error("Port %s is already in use" ,self.port )
+                raise PortInUseException("Port already in use") from e
+            elif "FileNotFoundError" in e.args[0]:
+                if self.log_file is not None :
+                    self.log_file.error("Port %s not found " ,self.port )
+                raise PortNotFound("Port unreachable or not available") from e
             else:
-                self.logFile.error("Failed to open serial stream with port %s", self.port)
-                self.logFile.error("%s", e)
-                raise(e)
+                if self.log_file is not None :
+                    self.log_file.error("Failed to open serial stream with port %s", self.port)
+                    self.log_file.error("%s", e)
+                raise SerialSettingsException(e) from e
 
-    def setPort(self, newport : str):
+    def set_port(self, newport : str):
         """
         Sets the port name.
 
@@ -165,34 +196,34 @@ class SerialSettings:
         """
         self.parity = newparity
 
-    def set_stopbits(self, newStopBits : StopBits):
+    def set_stopbits(self, new_stop_bits : StopBits):
         """
         Sets the stop bits setting.
 
         Args:
-            newStopBits (StopBits): The new stop bits setting.
+            new_stop_bits (StopBits): The new stop bits setting.
         """
-        self.stopbits = newStopBits
+        self.stopbits = new_stop_bits
 
-    def set_bytesize(self, newbytesize : ByteSize):
+    def set_bytesize(self, new_bytesize : ByteSize):
         """
         Sets the byte size setting.
 
         Args:
-            newbytesize (ByteSize): The new byte size setting.
+            new_bytesize (ByteSize): The new byte size setting.
         """
-        self.bytesize = newbytesize
+        self.bytesize = new_bytesize
 
-    def set_rtscts(self, newrtccts : bool):
+    def set_rtscts(self, new_rtccts : bool):
         """
         Sets the RTS/CTS flow control setting.
 
         Args:
-            newrtccts (bool): The new RTS/CTS flow control setting.
+            new_rtccts (bool): The new RTS/CTS flow control setting.
         """
-        self.rtscts = newrtccts
+        self.rtscts = new_rtccts
 
-    def toString(self) -> str :
+    def to_string(self) -> str :
         """
         Return current class as a string
 
@@ -200,19 +231,4 @@ class SerialSettings:
             str: class as string
         """
         parity = self.parity.name.replace("PARITY_","")
-        return f"Port : {self.port} \n BaudRate :{self.baudrate.value} \n Parity : {parity} \n StopBits : {self.stopbits.value} \n ByteSize : {self.bytesize.value} \n rtscts : {self.rtscts}"
-    
-    def SaveConfig(self , sectionName : str,SaveConfigFile  : configparser.ConfigParser):
-        """
-            Add current class values in the configFile
-        Args:
-            sectionName (str): name of the current section
-            SaveConfigFile (configparser.ConfigParser): configparser of the configuration file
-        """
-        
-        SaveConfigFile.set(sectionName,"Serial.Port", str(self.port))
-        SaveConfigFile.set(sectionName,"Serial.BaudRate",str(self.baudrate.value))
-        SaveConfigFile.set(sectionName,"Serial.Parity",str(self.parity.value))
-        SaveConfigFile.set(sectionName,"Serial.StopBits",str(self.stopbits.value))
-        SaveConfigFile.set(sectionName,"Serial.ByteSize",str(self.bytesize.value))
-        SaveConfigFile.set(sectionName,"Serial.RtcCts",str(self.rtscts))
+        return f"Port : {self.port} \n BaudRate :{self.baudrate.value} \n Parity : {parity} \n StopBits : {self.stopbits.value} \n ByteSize : {self.bytesize.value} \n rtscts : {self.rtscts}"  
