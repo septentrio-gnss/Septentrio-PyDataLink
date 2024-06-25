@@ -292,10 +292,13 @@ class ConnectionCard :
         configure_dialog = ConfigureInterface(stream , self.previous_tab)
         configure_dialog.accepted.connect(self.refresh_cards)
         configure_dialog.save_previous_tab.connect(self.save_previous_tab)
+        configure_dialog.save_config.connect(self.save_config)
         configure_dialog.exec_()
         
     def save_previous_tab(self, tab):
         self.previous_tab = tab
+    def save_config(self,stream):
+        self.stream = stream
 
     def refresh_cards(self):
         """Refresh sumarry value when a setting has changed
@@ -351,6 +354,7 @@ class ConfigureInterface(QDialog) :
     """Configuration dialog
     """
     save_previous_tab = Signal(int)
+    save_config = Signal(Stream)
     def __init__(self , stream : Stream , previous_tab : int = 0 ) -> None:
         super().__init__()
         self.setWindowTitle(f"Configure Connection {stream.stream_id}")
@@ -863,12 +867,13 @@ class ConfigureInterface(QDialog) :
         self.save_previous_tab.emit(self.config_tabs.currentIndex())
         if self.stream.ntrip_client.ntrip_settings.fixed_pos :
             self.stream.ntrip_client.create_gga_string()
+        self.save_config.emit(self.stream)
         self.accept()
 
     def cancel(self):
         """function called when cancel button is pressed
         """
-        self.stream = self.stream_save
+        self.save_config.emit(self.stream_save)
         self.reject()
 
     def open_script_file(self, input_widget : QLineEdit, checkbox: QCheckBox, connect_script : bool = None ):

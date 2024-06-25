@@ -43,6 +43,9 @@ This guide explains how to use pyDatalink software. It comes with 3 types of int
 - Terminal Interface
 
 These interfaces are used to configure connections, launch them and, if necessary, link them together. 
+<div align="center">
+<img src="doc_sources/pyDatalink.PNG" >
+</div>
 # Installation
 As pyDatalink app is entirely developed with python, you must first install python and all its dependencies.
 ## Install Python 
@@ -68,8 +71,8 @@ Once you've installed python, all you have to do is download the source code and
 
 ### Using git clone
 ```
-git clone https://github.com/septentrio-gnss/DataLink.git
-cd DataLink
+git clone https://github.com/septentrio-gnss/Septentrio-PyDataLink.git
+cd Septentrio-PyDataLink
 ```
 ### Using GitHub
  - First click on **code**.<br>
@@ -86,7 +89,7 @@ pip install -r requirements.txt
 ```
 # Graphical Interface
 <div align="center">
-<img src="doc_sources/pyDatalink.PNG" width="75%">
+<img src="doc_sources/pyDatalink_GUI.PNG" >
 </div>
 <br>
 The graphical interface is the interface that allows you to perform the most tasks. It gives you access to the full range of pydatalink functions.
@@ -105,11 +108,11 @@ The graphical interface is the interface that allows you to perform the most tas
 Use the following command to use pyDatalink in Graphical Interface mode 
 
 ```
-python pyDatalinkApp.py -m GUI
+python pyDatalink.py -m GUI
 ```
 or 
 ```
-python pyDatalinkApp.py
+python pyDatalink.py
 ```
 # Command Line Interface
 <div align="center">
@@ -158,10 +161,15 @@ ntrip://[user]:[pwd]@[adrr]:[port]/[mountpoint]#[linkport]
 The details of the different values for the configuration for a NTRIP connection are available further down in the document : [NTRIP Settings](#ntrip-settings)
 ### Example
 In this exemple we create 2 serial stream that are inter connected 
+#### Unix
 ```
-python DatalinkApp.py --Mode CMD --Streams serial:///dev/ttyACM0:115200:n:1:8:0#1 serial:///dev/ttyACM1:115200:n:1:8:0#0 
+python pyDatalink.py --Mode CMD --Streams serial:///dev/ttyACM0:115200:n:1:8:0#1 serial:///dev/ttyACM1:115200:n:1:8:0#0 
 ```
 
+#### Windows
+```
+python pyDatalink.py --Mode CMD --Streams serial://COM7:115200:n:1:8:0#1 serial://COM6:115200:n:1:8:0#0 
+```
 
 # Terminal Interface
 <div align="center">
@@ -172,7 +180,7 @@ The project propose a menu-based TUI, providing a semi-graphical way to configur
 
 To start the Data link in TUI mode
 ```
-python pyDatalinkApp.py -m TUI
+python pyDatalink.py -m TUI
 ```
 
 On this menu you can find the following items :
