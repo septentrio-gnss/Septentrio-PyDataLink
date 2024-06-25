@@ -185,6 +185,7 @@ class ConnectionCard :
         self.connect_thread = None
         self.worker = None
         self.show_data_dialog = None
+        self.previous_tab = 0
 
     def connection_card(self):
         """create the card widget
@@ -288,9 +289,13 @@ class ConnectionCard :
     def open_configure_interface(self,stream : Stream):
         """Open configuration dialog to configure current stream
         """
-        configure_dialog = ConfigureInterface(stream)
+        configure_dialog = ConfigureInterface(stream , self.previous_tab)
         configure_dialog.accepted.connect(self.refresh_cards)
+        configure_dialog.save_previous_tab.connect(self.save_previous_tab)
         configure_dialog.exec_()
+        
+    def save_previous_tab(self, tab):
+        self.previous_tab = tab
 
     def refresh_cards(self):
         """Refresh sumarry value when a setting has changed
@@ -345,6 +350,7 @@ class ConnectionCard :
 class ConfigureInterface(QDialog) :
     """Configuration dialog
     """
+    save_previous_tab = Signal(int)
     def __init__(self , stream : Stream , previous_tab : int = 0 ) -> None:
         super().__init__()
         self.setWindowTitle(f"Configure Connection {stream.stream_id}")
@@ -363,17 +369,21 @@ class ConfigureInterface(QDialog) :
         udp_menu =  self.udp_menu()
         ntrip_menu = self.ntrip_menu()
 
-        config_tabs = QTabWidget()
-        config_tabs.addTab(self.general_menu(), "General")
-        index = config_tabs.addTab(serial_menu , "Serial")
-        config_tabs.addTab(tcp_menu, "TCP")
-        config_tabs.addTab(udp_menu, "UDP")
-        config_tabs.addTab(ntrip_menu, "NTRIP")
+        self.config_tabs = QTabWidget()
+        self.config_tabs.addTab(self.general_menu(), "General")
+        index = self.config_tabs.addTab(serial_menu , "Serial")
+        self.config_tabs.addTab(tcp_menu, "TCP")
+        self.config_tabs.addTab(udp_menu, "UDP")
+        self.config_tabs.addTab(ntrip_menu, "NTRIP")
 
         if len(self.stream.serial_settings.get_available_port()) == 0 :
-            config_tabs.setTabEnabled(index,False)
+            self.config_tabs.setTabEnabled(index,False)
+            if previous_tab == index :
+                previous_tab = 0 
+        
+        self.config_tabs.setCurrentIndex(int(previous_tab))
 
-        configure_layout.addWidget(config_tabs)
+        configure_layout.addWidget(self.config_tabs)
         configure_layout.addLayout(self.bottom_button_layout())
 
     def general_menu(self):
@@ -850,6 +860,7 @@ class ConfigureInterface(QDialog) :
     def confirm(self):
         """function called when ok button is pressed
         """
+        self.save_previous_tab.emit(self.config_tabs.currentIndex())
         if self.stream.ntrip_client.ntrip_settings.fixed_pos :
             self.stream.ntrip_client.create_gga_string()
         self.accept()

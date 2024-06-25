@@ -42,8 +42,8 @@ status = subprocess.run(pyinstaller_command)
 
 if os.path.exists('build'):
     shutil.rmtree('build')
-# if os.path.exists(spec_file):
-#     os.remove(spec_file)
+if os.path.exists(spec_file):
+    os.remove(spec_file)
 
 if sys.platform == 'win32':
     deactivate_script = os.path.join(venv_dir, 'Scripts', 'deactivate.bat')
