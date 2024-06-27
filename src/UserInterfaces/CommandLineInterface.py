@@ -42,6 +42,8 @@ class CommandLineInterface:
     def run(self):
         """Start the thread
         """
+        if self.app is None:
+            return 0
         if len(self.app.stream_list) == 0 :
             return 0
         else :
