@@ -39,6 +39,9 @@ else:
     DATAFILESPATH = os.path.join(PROJECTPATH , "src" , "Data Files" )
 
 APPNAME = "PyDataLink"
+APPVERSION = "1.0.0-a"
+APPRELEASEDATA="27/06/2024"
+
 MAINSCRIPTPATH = os.path.join(PROJECTPATH , "pyDatalink.py")
 MAXFILENUMBER = 20
 DATAPATH = os.path.join(os.path.expanduser("~") , ".septentrio") # Path to the PyDataLink Data Folder
