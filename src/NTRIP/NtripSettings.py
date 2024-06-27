@@ -124,6 +124,7 @@ class NtripSettings:
         else :
             try:
                 ntrip_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                ntrip_socket.settimeout(5)
                 ntrip_socket.connect((self.host, self.port))
                 return ntrip_socket
             except Exception as e:

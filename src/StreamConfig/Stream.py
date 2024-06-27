@@ -972,6 +972,8 @@ class Stream:
                         temp_incoming_tranfert += len(incoming_data)
                     except socket.timeout:
                         incoming_data = ""
+                    except (socket.gaierror,socket.herror) as e : 
+                        raise e
                     # Print data if show data input 
                     if self.show_incoming_data.is_set() and len(incoming_data) != 0:
                         data_to_show.put(incoming_data)
