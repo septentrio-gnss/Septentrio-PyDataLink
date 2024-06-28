@@ -64,6 +64,36 @@ def pair_v_widgets(*widgets : QWidget) ->QVBoxLayout:
     result.setAlignment(Qt.AlignmentFlag.AlignTop)
     return result
 
+class NtripLineEdit(QLineEdit):
+    def __init__(self, other_widget, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.other_widget = other_widget
+
+    def focusInEvent(self, event):
+        # Disable the other QLineEdit
+        self.other_widget.setDisabled(True)
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event):
+        # Enable the other QLineEdit when this one loses focus
+        self.other_widget.setDisabled(False)
+        super().focusOutEvent(event)
+        
+class NtripSpinBox(QSpinBox):
+    def __init__(self, other_widget, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.other_widget = other_widget
+
+    def focusInEvent(self, event):
+        # Disable the other QLineEdit
+        self.other_widget.setDisabled(True)
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event):
+        # Enable the other QLineEdit when this one loses focus
+        self.other_widget.setDisabled(False)
+        super().focusOutEvent(event)
+
 class GraphicalUserInterface(QMainWindow):
     """Graphical interface for datalink
     """
@@ -667,7 +697,7 @@ class ConfigureInterface(QDialog) :
         ntrip_caster_box = QGroupBox("Ntrip Caster")
         ntrip_caster_layout = QVBoxLayout(ntrip_caster_box)
 
-        self.ntrip_host_name = QLineEdit()
+        self.ntrip_host_name = NtripLineEdit(None)
         self.ntrip_host_name.setText(self.stream.ntrip_client.ntrip_settings.host)
         host_name_label= QLabel("Host : ")
         host_name_label.setBuddy(self.ntrip_host_name)
@@ -679,10 +709,12 @@ class ConfigureInterface(QDialog) :
         ntrip_caster_layout.addLayout(host_name_layout)
 
         # Port Box
-        self.ntrip_port = QSpinBox()
+        self.ntrip_port = NtripSpinBox(self.ntrip_host_name)
         self.ntrip_port.setMaximumWidth(100)
         self.ntrip_port.setMaximum(65535)
         self.ntrip_port.setValue(self.stream.ntrip_client.ntrip_settings.port)
+        
+        self.ntrip_host_name.other_widget= self.ntrip_port
 
         port_label = QLabel("Port : ")
         port_label.setBuddy(self.ntrip_port)
@@ -780,8 +812,8 @@ class ConfigureInterface(QDialog) :
         #   SIGNALS
         self.ntrip_host_name.editingFinished.connect(self.update_mountpoint_list)
         self.ntrip_host_name.editingFinished.emit()
-
-        self.ntrip_port.valueChanged.connect(self.update_mountpoint_list)
+        self.ntrip_port.editingFinished.connect(self.update_mountpoint_list)
+        
 
         self.mountpoint_list.currentIndexChanged.connect(lambda : self.stream.ntrip_client.ntrip_settings.set_mountpoint(self.mountpoint_list.currentData()))
 
