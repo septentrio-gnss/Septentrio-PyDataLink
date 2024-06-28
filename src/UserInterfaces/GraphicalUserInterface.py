@@ -1257,12 +1257,12 @@ class StreamConnectWorker(QObject):
                 self.connection_card.stream.connect()
                 self.connection_card.configure_button.setDisabled(True)
                 self.connection_card.status.setText("CONNECTED")
-                self.connection_card.status.setStyleSheet("QLabel { color: #32a852;}")
+                self.connection_card.status.setStyleSheet("QLabel { color: #32a852; font-weight: bold;}")
                 self.connection_card.connect_button.setText("Disconnect")
             except StreamException as e :
                 self.connection_card.status.setText("ERROR DURING CONNECTION")
                 self.connection_card.status.setToolTip(str(e))
-                self.connection_card.status.setStyleSheet("QLabel { color: #c42323;}")
+                self.connection_card.status.setStyleSheet("QLabel { color: #c42323; font-weight: bold;}")
         else :
             try :
                 self.connection_card.stream.disconnect()

@@ -578,7 +578,7 @@ class Stream:
     # Thread task Methods 
     
     def datalink_serial_task(self, serial: Serial, linked_data: list[queue.Queue], update_linked_ports_queue: queue.Queue 
-                           , data_to_show : queue.Queue  ):
+                           , data_to_show : queue.Queue  , logger ):
         """
         The task for data link Stream using serial communication.
 
@@ -599,7 +599,7 @@ class Stream:
             self.log_file.info("Stream %i : sending startup script" , self.stream_id )
         try:
             if not self.linked_data[self.stream_id].empty():
-                task_send_command(self.linked_data[self.stream_id],serial,logger=self.logger,line_termination=self.line_termination)
+                task_send_command(self.linked_data[self.stream_id],serial,logger=logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
                 self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
@@ -621,12 +621,12 @@ class Stream:
                             if self.show_incoming_data.is_set() :
                                 data_to_show.put(incoming_data.decode(encoding='ISO-8859-1'))
                             if self.logging:
-                                self.logger.write(incoming_data.decode(encoding='ISO-8859-1'))
+                                logger.write(incoming_data.decode(encoding='ISO-8859-1'))
                             if linked_ports is not None:
                                 for portid in linked_ports:
                                     linked_data[portid].put(incoming_data)
                         if not linked_data[self.stream_id].empty():
-                            temp_outgoing_tranfert += task_send_command(linked_data[self.stream_id],serial,self.show_outgoing_data.is_set(), data_to_show=data_to_show,logger=self.logger,line_termination=self.line_termination )
+                            temp_outgoing_tranfert += task_send_command(linked_data[self.stream_id],serial,self.show_outgoing_data.is_set(), data_to_show=data_to_show,logger=logger,line_termination=self.line_termination )
             except Exception as e:
                 self._exception_disconnect()
                 if self.log_file is not None :
@@ -641,7 +641,7 @@ class Stream:
             self.log_file.info("Stream %i : sending closing script" , self.stream_id )
         try :
             if not self.linked_data[self.stream_id].empty():
-                task_send_command(linked_data[self.stream_id],serial,logger=self.logger,line_termination=self.line_termination)
+                task_send_command(linked_data[self.stream_id],serial,logger=logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
                 self.log_file.error("Stream %i :  closing script couldn't finish : %e " , self.stream_id , e)
@@ -649,7 +649,7 @@ class Stream:
         return 0
 
     def datalink_tcp_server_task(self, tcp: socket.socket, linked_data: list[queue.Queue], update_linked_ports_queue: queue.Queue 
-                              ,  data_to_show : queue.Queue):
+                              ,  data_to_show : queue.Queue , logger):
         """
         The task for data link Stream using TCP communication.
 
@@ -677,7 +677,7 @@ class Stream:
             self.log_file.info("Stream %i : sending startup script" , self.stream_id )
         try:
             if not self.linked_data[self.stream_id].empty():
-                task_send_command(self.linked_data[self.stream_id],conn,logger=self.logger,line_termination=self.line_termination)
+                task_send_command(self.linked_data[self.stream_id],conn,logger=logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
                 self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
@@ -703,7 +703,7 @@ class Stream:
                         incoming_data = ""
                     if len(incoming_data) != 0 :
                         if self.logging:
-                            self.logger.write(incoming_data.decode(encoding='ISO-8859-1'))
+                            logger.write(incoming_data.decode(encoding='ISO-8859-1'))
                         # Print data if show data input
                         if self.show_incoming_data.is_set() :
                             data_to_show.put(incoming_data.decode(encoding='ISO-8859-1'))
@@ -713,7 +713,7 @@ class Stream:
                                 linked_data[portid].put(incoming_data)
                     #Send output data comming from other streams and print data if showdata is set
                     if not linked_data[self.stream_id].empty():
-                        temp_outgoing_tranfert+= task_send_command(linked_data[self.stream_id] , conn , self.show_outgoing_data.is_set(), data_to_show=data_to_show,logger=self.logger,line_termination=self.line_termination)
+                        temp_outgoing_tranfert+= task_send_command(linked_data[self.stream_id] , conn , self.show_outgoing_data.is_set(), data_to_show=data_to_show,logger=logger,line_termination=self.line_termination)
                 else :
                     time.sleep(1)
                     #Wait for a new Client if the current one has disconnect
@@ -745,7 +745,7 @@ class Stream:
             self.log_file.info("Stream %i : sending closing script" , self.stream_id )
         try : 
             if not self.linked_data[self.stream_id].empty():
-                task_send_command(self.linked_data[self.stream_id],conn,logger=self.logger,line_termination=self.line_termination)
+                task_send_command(self.linked_data[self.stream_id],conn,logger=logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
                     self.log_file.error("Stream %i :  closing script couldn't finish : %e " , self.stream_id , e)
@@ -769,7 +769,7 @@ class Stream:
             self.log_file.info("Stream %i : sending startup script" , self.stream_id )
         try:
             if not self.linked_data[self.stream_id].empty():
-                task_send_command(self.linked_data[self.stream_id],tcp,logger=self.logger,line_termination=self.line_termination)
+                task_send_command(self.linked_data[self.stream_id],tcp,logger=logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
                 self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
@@ -809,7 +809,7 @@ class Stream:
                                 linked_data[portid].put(incoming_data)
                     # Output data comming from other streams
                     if not linked_data[self.stream_id].empty():
-                        returnedValue = task_send_command(linked_data[self.stream_id],tcp,self.show_outgoing_data.is_set(),data_to_show=data_to_show,logger=self.logger,line_termination=self.line_termination)
+                        returnedValue = task_send_command(linked_data[self.stream_id],tcp,self.show_outgoing_data.is_set(),data_to_show=data_to_show,logger=logger,line_termination=self.line_termination)
                         if returnedValue is not None :
                             temp_outgoing_tranfert += returnedValue
                 else : 
@@ -838,7 +838,7 @@ class Stream:
             self.log_file.info("Stream %i : main loop ended ",self.stream_id )
             self.log_file.info("Stream %i : sending closing script" , self.stream_id )
         try : 
-            task_send_command(self.linked_data[self.stream_id],tcp,logger=self.logger,line_termination=self.line_termination)
+            task_send_command(self.linked_data[self.stream_id],tcp,logger=logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
                     self.log_file.error("Stream %i :  closing script couldn't finish : %e " , self.stream_id , e)
@@ -866,7 +866,7 @@ class Stream:
         try:
             if not self.linked_data[self.stream_id].empty():
                 if sendaddress is not None:
-                    task_send_command(self.linked_data[self.stream_id] , stream=udp , udp_send_address=sendaddress,logger = self.logger,line_termination = self.line_termination)
+                    task_send_command(self.linked_data[self.stream_id] , stream=udp , udp_send_address=sendaddress,logger = logger,line_termination = self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
                 self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
@@ -905,7 +905,7 @@ class Stream:
                                 send_to_addresse = (bytes_address_pair[1],self.udp_settings.port)
                             else :
                                 send_to_addresse = sendaddress
-                                returned_value = task_send_command(self.linked_data[self.stream_id] , stream=self.stream , show_data=self.show_outgoing_data.is_set() , udp_send_address=send_to_addresse , data_to_show=self.data_to_show,logger=self.logger,line_termination=self.line_termination)
+                                returned_value = task_send_command(self.linked_data[self.stream_id] , stream=self.stream , show_data=self.show_outgoing_data.is_set() , udp_send_address=send_to_addresse , data_to_show=self.data_to_show,logger=logger,line_termination=self.line_termination)
                                 if returned_value is not None :
                                     temp_outgoing_tranfert += returned_value
             except Exception as e:
@@ -923,7 +923,7 @@ class Stream:
         try : 
             if not self.linked_data[self.stream_id].empty():
                 if sendaddress is not None:
-                    task_send_command(self.linked_data[self.stream_id] ,stream= udp  , udp_send_address=sendaddress,logger=self.logger,line_termination=self.line_termination)
+                    task_send_command(self.linked_data[self.stream_id] ,stream= udp  , udp_send_address=sendaddress,logger=logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
                 self.log_file.error("Stream %i :  closing script couldn't finish : %e " , self.stream_id , e)
@@ -952,7 +952,7 @@ class Stream:
             if self.ntrip_client.ntrip_settings.fixed_pos :
                 self.linked_data[self.stream_id].put(self.ntrip_client.fixed_pos_gga)
             if not self.linked_data[self.stream_id].empty():
-                task_send_command(self.linked_data[self.stream_id],ntrip ,logger=self.logger,line_termination=self.line_termination)
+                task_send_command(self.linked_data[self.stream_id],ntrip ,logger=logger,line_termination=self.line_termination)
         except TaskException as e :
             if self.log_file is not None :
                     self.log_file.error("Stream %i :  Start script couldn't finish : %e ", self.stream_id , e )
@@ -987,7 +987,7 @@ class Stream:
                                 linked_data[portid].put(incoming_data.decode(encoding='ISO-8859-1'))
                     #Send output data comming from other streams and print data if showdata is set
                     if not linked_data[self.stream_id].empty():
-                        returnedValue = task_send_command(linked_data[self.stream_id],ntrip ,self.show_outgoing_data.is_set(),data_to_show=data_to_show,logger=self.logger,line_termination=self.line_termination)
+                        returnedValue = task_send_command(linked_data[self.stream_id],ntrip ,self.show_outgoing_data.is_set(),data_to_show=data_to_show,logger=logger,line_termination=self.line_termination)
                         if returnedValue is not None :
                             temp_outgoing_tranfert += returnedValue
             except Exception as e:
@@ -1006,7 +1006,7 @@ class Stream:
             if not self.linked_data[self.stream_id].empty():
 
                 task_send_command(self.linked_data[self.stream_id],ntrip,
-                                  logger=self.logger,line_termination=self.line_termination)
+                                  logger=logger,line_termination=self.line_termination)
 
         except TaskException as e :
             if self.log_file is not None :
@@ -1079,11 +1079,10 @@ def task_send_command(linked_data : queue.Queue , stream  : Serial | socket.sock
     try :
         for _ in range(linked_data.qsize()):
             outgoing_data = linked_data.get()
+            if isinstance(outgoing_data, str):
+                outgoing_data = outgoing_data.encode(encoding='ISO-8859-1')
             if isinstance(stream , Serial):
-                
-                val = stream.write(outgoing_data)
-                constants.SAVEVALUE += val
-                print(constants.SAVEVALUE)
+                stream.write(outgoing_data)
             elif isinstance(stream, socket.socket) and udp_send_address is None:
                 stream.sendall(outgoing_data)
             elif isinstance(stream, socket.socket) :
