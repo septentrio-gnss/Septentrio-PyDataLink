@@ -128,13 +128,30 @@ The PySide project is developed in the open, with all facilities you’d expect 
 
 </div>
 
+## Application Log Files Directory
+
+To assist in debugging the code or retracing steps when encountering a bug, a log file is created each time you start the application.
+
+### Log Directory for Windows
+
+```
+C:\Users\{YOUR_USER}\.septentrio\logs
+```
+
+### Log Directory for Unix
+
+```
+/home/{YOUR_USER}/.septentrio/logs
+```
+
+Please note that the directory path for Unix distributions may change in the future with the implementation of the XDG Base Directory Specification.
+
 ## SUGGESTIONS FOR IMPROVEMENTS
 
 There are several possible enhancements to the code that is available today. Therefore, from septentrio we want to warn about some features of the code that can be improved and at the same time invite users willing to help or with ideas for improvement to share those ideas or feedback here on GitHub or through the septentrio support page.
 
-These are some of the points to improve or features to add:
+These are some of the points to improve or features to add :
 
-- Create Exectuble with PyInstaller
 - Add Support for virtual serial port
 
 

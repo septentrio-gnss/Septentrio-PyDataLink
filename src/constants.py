@@ -37,8 +37,13 @@ if getattr(sys, 'frozen', False):
 else:
     PROJECTPATH = os.path.abspath(os.path.dirname(__file__)).replace("\\src","") #Path to the project folder
     DATAFILESPATH = os.path.join(PROJECTPATH , "src" , "Data Files" )
+    
+
 
 APPNAME = "PyDataLink"
+APPVERSION = "1.0.0-a"
+APPRELEASEDATA="27/06/2024"
+
 MAINSCRIPTPATH = os.path.join(PROJECTPATH , "pyDatalink.py")
 MAXFILENUMBER = 20
 DATAPATH = os.path.join(os.path.expanduser("~") , ".septentrio") # Path to the PyDataLink Data Folder
@@ -46,6 +51,14 @@ CONFIGPATH = os.path.join(DATAPATH , "confs" )   # Path to the Configuration fol
 LOGFILESPATH =  os.path.join(DATAPATH ,"logs")   # Path to the Logs folder
 DEFAULTCONFIGFILE = os.path.join(CONFIGPATH ,"pydatalink.conf")  # Path to the default configuration file
 
+# Check if folder exist else create them 
+if os.path.exists(DATAPATH) is not True :
+    os.mkdir(DATAPATH)
+if os.path.exists( CONFIGPATH ) is not True:
+    os.mkdir(CONFIGPATH )
+if os.path.exists( LOGFILESPATH ) is not True:
+    os.mkdir(LOGFILESPATH )
+    
 # Create logging file for the app
 now = datetime.datetime.now()
 filename = now.strftime("pyDatalink_%Y-%m-%d_%H-%M.log")

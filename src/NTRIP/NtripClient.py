@@ -87,20 +87,20 @@ class NtripClient:
             if self.log_file is not None :
                 self.log_file.debug("Create NTRIP Client socket")
             self.socket = self.ntrip_settings.connect()
-            self.connected = True
             if self.log_file is not None :
                 self.log_file.info("NTRIP Client socket Created")
             self._connect_request()
+            self.connected = True
         except NtripSettingsException as e:
+            self.close()
             self.connected = False
+            if self.log_file is not None :
+                self.log_file.error("Error while creating NTRIP Socket")
             raise e
 
     def send_nmea(self, nmea_message):
         """Sending nmea message to the ntrip caster
         """
-        if self.log_file is not None :
-            self.log_file.debug("Sending NMEA Message : %s", nmea_message)
-
         if self.ntrip_settings.ntrip_version == 2 :
             request = "GET /"+ self.ntrip_settings.mountpoint +" HTTP/1.1\r\n"
         else :
@@ -143,8 +143,8 @@ class NtripClient:
         request += "Host: " + self.ntrip_settings.host + "\r\n"
         request += "User-Agent: NTRIP pydatalink Client\r\n"
         request += "Ntrip-Version: Ntrip/2.0\r\n"
-        if self.ntrip_settings.auth :
-            request+="Authorization: Basic " +  base64.b64encode((self.ntrip_settings.username + ":" + self.ntrip_settings.password).encode()).decode() + "\r\n"
+        # if self.ntrip_settings.auth :
+        #     request+="Authorization: Basic " +  base64.b64encode((self.ntrip_settings.username + ":" + self.ntrip_settings.password).encode()).decode() + "\r\n"
         request += "Connection: close\r\n\r\n"
 
         try :
@@ -163,11 +163,16 @@ class NtripClient:
             if self.log_file is not None :
                 self.log_file.info("parsing source table ")
             # Parse the response to extract the resource table
+            source_table : list[NtripSourceTable]= []
             response : str= response.split("\r\n\r\n")[1]
             sources = response.split("STR;")
+            
+            if len(sources) <= 2 :
+                if self.log_file is not None :
+                    self.log_file.debug("returned source table empty")
+                return source_table
             sources.pop(0)
             sources.pop()
-            source_table : list[NtripSourceTable]= []
             for source in sources :
                 newsourcetable = source.split(";")
                 source_table.append(NtripSourceTable(newsourcetable[0],newsourcetable[1],newsourcetable[2],newsourcetable[3]))
@@ -275,17 +280,25 @@ class NtripClient:
             self.connected = False
         except Exception as e:
             raise ClosingError("Error while clossing the socket") from e
-
-    def set_settings_host(self, host):
-        """
-        Set a new ntrip caster hostname and retrieve the new source table
-        """
-        self.ntrip_settings.set_host(host)
-        if self.log_file is not None:
-            self.log_file.info("New NTRIP Host Name : %s" , host)
+        
+    def update_source_table(self):
         try :
             self.ntrip_settings.source_table = self.get_source_table()
         except NtripClientError as e :
             if self.log_file is not None:
                 self.log_file.error("Failed to get Source Table : %s" , e )
             raise SourceTableRequestError("Error while getting the new source table") from e
+
+    def set_settings_host(self, host):
+        """
+        Set a new ntrip caster hostname and retrieve the new source table
+        """
+        if host != self.ntrip_settings.host :
+            self.ntrip_settings.set_host(host)
+            if self.log_file is not None:
+                self.log_file.info("New NTRIP Host Name : %s" , host)
+            try :
+                self.update_source_table()
+            except SourceTableRequestError as e :
+                raise e
+        

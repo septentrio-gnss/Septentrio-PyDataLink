@@ -64,6 +64,36 @@ def pair_v_widgets(*widgets : QWidget) ->QVBoxLayout:
     result.setAlignment(Qt.AlignmentFlag.AlignTop)
     return result
 
+class NtripLineEdit(QLineEdit):
+    def __init__(self, other_widget, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.other_widget = other_widget
+
+    def focusInEvent(self, event):
+        # Disable the other QLineEdit
+        self.other_widget.setDisabled(True)
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event):
+        # Enable the other QLineEdit when this one loses focus
+        self.other_widget.setDisabled(False)
+        super().focusOutEvent(event)
+        
+class NtripSpinBox(QSpinBox):
+    def __init__(self, other_widget, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.other_widget = other_widget
+
+    def focusInEvent(self, event):
+        # Disable the other QLineEdit
+        self.other_widget.setDisabled(True)
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event):
+        # Enable the other QLineEdit when this one loses focus
+        self.other_widget.setDisabled(False)
+        super().focusOutEvent(event)
+
 class GraphicalUserInterface(QMainWindow):
     """Graphical interface for datalink
     """
@@ -667,7 +697,7 @@ class ConfigureInterface(QDialog) :
         ntrip_caster_box = QGroupBox("Ntrip Caster")
         ntrip_caster_layout = QVBoxLayout(ntrip_caster_box)
 
-        self.ntrip_host_name = QLineEdit()
+        self.ntrip_host_name = NtripLineEdit(None)
         self.ntrip_host_name.setText(self.stream.ntrip_client.ntrip_settings.host)
         host_name_label= QLabel("Host : ")
         host_name_label.setBuddy(self.ntrip_host_name)
@@ -679,17 +709,19 @@ class ConfigureInterface(QDialog) :
         ntrip_caster_layout.addLayout(host_name_layout)
 
         # Port Box
-        port = QSpinBox()
-        port.setMaximumWidth(100)
-        port.setMaximum(65535)
-        port.setValue(self.stream.ntrip_client.ntrip_settings.port)
+        self.ntrip_port = NtripSpinBox(self.ntrip_host_name)
+        self.ntrip_port.setMaximumWidth(100)
+        self.ntrip_port.setMaximum(65535)
+        self.ntrip_port.setValue(self.stream.ntrip_client.ntrip_settings.port)
+        
+        self.ntrip_host_name.other_widget= self.ntrip_port
 
         port_label = QLabel("Port : ")
-        port_label.setBuddy(port)
+        port_label.setBuddy(self.ntrip_port)
 
         port_layout = QHBoxLayout()
         port_layout.addWidget(port_label)
-        port_layout.addWidget(port)
+        port_layout.addWidget(self.ntrip_port)
         port_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         port_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         ntrip_caster_layout.addLayout(port_layout)
@@ -737,7 +769,7 @@ class ConfigureInterface(QDialog) :
 
         # FIXED POSITION Box
 
-        fixed_position_box = QGroupBox("Fixed position for GGA ")  
+        fixed_position_box = QGroupBox("Fixed position for GGA ")
         fixed_position_box.setCheckable(True)
         fixed_position_box.setChecked(self.stream.ntrip_client.ntrip_settings.fixed_pos)
 
@@ -778,10 +810,10 @@ class ConfigureInterface(QDialog) :
         result_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         #   SIGNALS
-        self.ntrip_host_name.editingFinished.connect(lambda: self.update_mountpoint_list())
+        self.ntrip_host_name.editingFinished.connect(self.update_mountpoint_list)
         self.ntrip_host_name.editingFinished.emit()
-
-        port.valueChanged.connect(lambda : self.stream.ntrip_client.ntrip_settings.set_port(port.value()))
+        self.ntrip_port.editingFinished.connect(self.update_mountpoint_list)
+        
 
         self.mountpoint_list.currentIndexChanged.connect(lambda : self.stream.ntrip_client.ntrip_settings.set_mountpoint(self.mountpoint_list.currentData()))
 
@@ -800,19 +832,25 @@ class ConfigureInterface(QDialog) :
     def update_mountpoint_list(self):
         """update the list of available mountpoint selectable.
         """
-        self.mountpoint_list.clear()
-        self.mountpoint_list.setPlaceholderText("Waiting for source table ...")
-        self.update_thread = QThread()
-        self.worker = SourceTableWorker(self)
-        self.worker.moveToThread(self.update_thread)
-        self.update_thread.started.connect(self.worker.run)
-        self.worker.finished.connect(self.update_thread.quit)
-        self.worker.finished.connect(self.worker.deleteLater)
-        self.update_thread.finished.connect(self.update_thread.deleteLater)
-        self.update_thread.finished.connect(self.cleanup)
-        self.worker.finished.connect(self.task_get_new_source_table)
+        
+        if len(self.ntrip_host_name.text()) < 1 :
+            self.mountpoint_list.setPlaceholderText("List unavailable")
+        else: 
+            self.ntrip_port.setDisabled(True)
+            self.ntrip_host_name.setDisabled(True)
+            self.mountpoint_list.clear()
+            self.mountpoint_list.setPlaceholderText("Waiting for source table ...")
+            self.update_thread = QThread()
+            self.worker = SourceTableWorker(self)
+            self.worker.moveToThread(self.update_thread)
+            self.update_thread.started.connect(self.worker.run)
+            self.worker.finished.connect(self.update_thread.quit)
+            self.worker.finished.connect(self.worker.deleteLater)
+            self.update_thread.finished.connect(self.update_thread.deleteLater)
+            self.update_thread.finished.connect(self.cleanup)
+            self.worker.finished.connect(self.task_get_new_source_table)
 
-        self.update_thread.start()
+            self.update_thread.start()
 
     def cleanup(self):
         self.update_thread = None
@@ -821,26 +859,23 @@ class ConfigureInterface(QDialog) :
     def task_get_new_source_table(self):
         """ get new source table from the new ntrip caster
         """
-        if len(self.ntrip_host_name.text()) < 1 :
+        self.ntrip_port.setDisabled(False)
+        self.ntrip_host_name.setDisabled(False)
+
+        if self.stream.ntrip_client.ntrip_settings.source_table is None :
             self.mountpoint_list.setPlaceholderText("List unavailable")
+        
+        elif len(self.stream.ntrip_client.ntrip_settings.source_table) != 0:
+            currentindex : int = 3
+            for source, index in zip(self.stream.ntrip_client.ntrip_settings.source_table , range(len(self.stream.ntrip_client.ntrip_settings.source_table))):
+                self.mountpoint_list.addItem(source.mountpoint, source.mountpoint)
+                if self.stream.ntrip_client.ntrip_settings.mountpoint is not None and self.stream.ntrip_client.ntrip_settings.mountpoint == source.mountpoint:
+                    currentindex = index
+                    
+            self.mountpoint_list.setPlaceholderText("")
+            self.mountpoint_list.setCurrentIndex(currentindex)
         else :
-            try :
-                if self.stream.ntrip_client.ntrip_settings.source_table is None :
-                    self.mountpoint_list.setPlaceholderText("List unavailable")
-                
-                elif len(self.stream.ntrip_client.ntrip_settings.source_table) != 0:
-                    currentindex : int = 3
-                    for source, index in zip(self.stream.ntrip_client.ntrip_settings.source_table , range(len(self.stream.ntrip_client.ntrip_settings.source_table))):
-                        self.mountpoint_list.addItem(source.mountpoint, source.mountpoint)
-                        if self.stream.ntrip_client.ntrip_settings.mountpoint is not None and self.stream.ntrip_client.ntrip_settings.mountpoint == source.mountpoint:
-                            currentindex = index
-                            
-                    self.mountpoint_list.setPlaceholderText("")
-                    self.mountpoint_list.setCurrentIndex(currentindex)
-                else :
-                    self.mountpoint_list.setPlaceholderText("List unavailable")
-            except NtripClientError :
-                self.mountpoint_list.setPlaceholderText("List unavailable")
+            self.mountpoint_list.setPlaceholderText("List unavailable")
 
     def bottom_button_layout(self):
         """Create the ok and cancel button of the dialog
@@ -964,7 +999,7 @@ class ShowDataInterface(QDialog):
         if self.stream.data_to_show.empty() is False :
             value = self.stream.data_to_show.get()
             if not self.freeze :
-                self.show_data_output.insertPlainText( value + "\n" )
+                self.show_data_output.insertPlainText( value )
                 self.show_data_output.moveCursor(QTextCursor.End)
                 self.show_data_output.horizontalScrollBar().setValue(self.show_data_output.horizontalScrollBar().minimum())
 
@@ -1152,15 +1187,15 @@ class AboutDialog(QDialog):
 
         self.setWindowIcon(QIcon(os.path.join(DATAFILESPATH , 'pyDatalink_icon.png')))
         self.setWindowTitle("About PyDatalink")
-        button  = QDialogButtonBox.Ok
+        dialoglayout = QVBoxLayout()
 
-        self.button_box = QDialogButtonBox(button)
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok)
         self.button_box.accepted.connect(self.accept)
-        # Add Version
-        # add Link to github repo
-        # add Description
-        # Add Warning for still in testing
-        self.dialoglayout = QVBoxLayout()
+        
+        new_separator = QFrame()
+        new_separator.setFrameShape(QFrame.HLine)
+        new_separator.setFrameShadow(QFrame.Sunken)
+        new_separator.setLineWidth(1)
 
         about_logo_label = QLabel()
         logo = QPixmap(os.path.join(DATAFILESPATH ,"pyDatalink_Logo.png"))
@@ -1170,14 +1205,22 @@ class AboutDialog(QDialog):
         about_logo_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
         about_label = QLabel()
-        about_label.setText(" PyDatalink \n Version 1.0a\n 2024 , Septentrio")
-        about_label.setStyleSheet(" font-weight: bold;")
+        about_label.setText(f'Version : {APPVERSION} \nRelease Data : {APPRELEASEDATA} \nAuthors : Septentrio , Arno Balois')
         about_label.setScaledContents(True)
+        about_label.setStyleSheet("QLabel {font-weight: bold;}")
 
-        self.dialoglayout.addLayout(pair_h_widgets(about_logo_label,about_label))
-        self.dialoglayout.addWidget(self.button_box)
-        self.dialoglayout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.setLayout(self.dialoglayout)
+        septentrio_link = QLabel()
+        septentrio_link.setText('Try Septentrio GNSS receivers for best performance :<br> <a href="https://web.septentrio.com/UBL-SSN-rx">Discover Septentrio product</a>')
+        septentrio_link.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        septentrio_link.setOpenExternalLinks(True)
+
+        dialoglayout.addWidget(about_logo_label)
+        dialoglayout.addWidget(new_separator)
+        dialoglayout.addWidget(about_label)
+        dialoglayout.addWidget(septentrio_link)
+        dialoglayout.addWidget(self.button_box)
+        dialoglayout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setLayout(dialoglayout)
 
 class SourceTableWorker(QObject):
     """worker for getting source table thread
@@ -1190,7 +1233,11 @@ class SourceTableWorker(QObject):
 
     def run(self):
         try :
-            self.configure_interface.stream.ntrip_client.set_settings_host(self.configure_interface.ntrip_host_name.text())
+            if self.configure_interface.ntrip_host_name.text() != self.configure_interface.stream.ntrip_client.ntrip_settings.host :
+                self.configure_interface.stream.ntrip_client.set_settings_host(self.configure_interface.ntrip_host_name.text())
+            elif self.configure_interface.stream.ntrip_client.ntrip_settings.port != self.configure_interface.ntrip_port :
+                self.configure_interface.stream.ntrip_client.ntrip_settings.set_port(self.configure_interface.ntrip_port.value())
+                self.configure_interface.stream.ntrip_client.update_source_table()
         except NtripClientError:
             self.configure_interface.stream.ntrip_client.ntrip_settings.source_table = None
         self.finished.emit()
@@ -1210,12 +1257,12 @@ class StreamConnectWorker(QObject):
                 self.connection_card.stream.connect()
                 self.connection_card.configure_button.setDisabled(True)
                 self.connection_card.status.setText("CONNECTED")
-                self.connection_card.status.setStyleSheet("QLabel { color: #32a852;}")
+                self.connection_card.status.setStyleSheet("QLabel { color: #32a852; font-weight: bold;}")
                 self.connection_card.connect_button.setText("Disconnect")
             except StreamException as e :
                 self.connection_card.status.setText("ERROR DURING CONNECTION")
                 self.connection_card.status.setToolTip(str(e))
-                self.connection_card.status.setStyleSheet("QLabel { color: #c42323;}")
+                self.connection_card.status.setStyleSheet("QLabel { color: #c42323; font-weight: bold;}")
         else :
             try :
                 self.connection_card.stream.disconnect()
