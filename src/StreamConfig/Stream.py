@@ -269,7 +269,7 @@ class Stream:
                         self.log_file.debug("Stream %s : start final configuration " , self.stream_id)
 
                     self.stop_event.clear()
-
+                    self._clear_queue(self.linked_data[self.stream_id])
                     if self.logging :
                         self.logger = open(self.logging_file,"w",encoding="utf-8")
 
@@ -281,9 +281,8 @@ class Stream:
                         if self.log_file is not None :
                             self.log_file.debug("Stream %s : init startup script file :  %s" , self.stream_id,self.startup_script)
 
-                        self._clear_queue(self.linked_data[self.stream_id])
                         self.send_script(self.linked_data[self.stream_id], True)
-                    self.datalink_stream_thread = threading.Thread(target=task,args=(self.stream, self.linked_data, self.update_linked_ports_queue,self.data_to_show))
+                    self.datalink_stream_thread = threading.Thread(target=task,args=(self.stream, self.linked_data, self.update_linked_ports_queue,self.data_to_show , self.logger))
 
                     if self.log_file is not None :
                         self.log_file.debug("Stream %s : Starting Thread " , self.stream_id)
@@ -616,16 +615,16 @@ class Stream:
             try:
                 if serial is not None:
                     if serial.is_open:
-                        incoming_data = serial.readline().decode(encoding='ISO-8859-1')
+                        incoming_data = serial.readline()
                         temp_incoming_tranfert += len(incoming_data)
-                        if self.show_incoming_data.is_set() and len(incoming_data) != 0:
-                            data_to_show.put(incoming_data)
+                        if len(incoming_data) != 0 :
+                            if self.show_incoming_data.is_set() :
+                                data_to_show.put(incoming_data.decode(encoding='ISO-8859-1'))
                             if self.logging:
-                                self.logger.write(incoming_data)
-                        if linked_ports is not None:
-                            for portid in linked_ports:
-                                port_queue: queue.Queue = linked_data[portid]
-                                port_queue.put(incoming_data)
+                                self.logger.write(incoming_data.decode(encoding='ISO-8859-1'))
+                            if linked_ports is not None:
+                                for portid in linked_ports:
+                                    linked_data[portid].put(incoming_data)
                         if not linked_data[self.stream_id].empty():
                             temp_outgoing_tranfert += task_send_command(linked_data[self.stream_id],serial,self.show_outgoing_data.is_set(), data_to_show=data_to_show,logger=self.logger,line_termination=self.line_termination )
             except Exception as e:
@@ -696,22 +695,22 @@ class Stream:
                 if conn is not None:
                     #Read input data 
                     try:
-                        incoming_data = conn.recv(4096).decode(encoding='ISO-8859-1')
+                        incoming_data = conn.recv(4096)
                         temp_incoming_tranfert += len(incoming_data)
                         if len(incoming_data) == 0:
                             conn = None
                     except socket.timeout:
                         incoming_data = ""
-                    # Print data if show data input 
-                    if self.show_incoming_data.is_set() and len(incoming_data) != 0:
-                        data_to_show.put(incoming_data)
+                    if len(incoming_data) != 0 :
                         if self.logging:
-                                self.logger.write(incoming_data)
-                    # Send input data to linked Streams
-                    if linked_ports is not None and len(incoming_data) != 0:
-                        for portid in linked_ports:
-                            linked_data[portid].put(incoming_data)
-                            
+                            self.logger.write(incoming_data.decode(encoding='ISO-8859-1'))
+                        # Print data if show data input
+                        if self.show_incoming_data.is_set() :
+                            data_to_show.put(incoming_data.decode(encoding='ISO-8859-1'))
+                        # Send input data to linked Streams
+                        if linked_ports is not None :
+                            for portid in linked_ports:
+                                linked_data[portid].put(incoming_data)
                     #Send output data comming from other streams and print data if showdata is set
                     if not linked_data[self.stream_id].empty():
                         temp_outgoing_tranfert+= task_send_command(linked_data[self.stream_id] , conn , self.show_outgoing_data.is_set(), data_to_show=data_to_show,logger=self.logger,line_termination=self.line_termination)
@@ -719,7 +718,7 @@ class Stream:
                     time.sleep(1)
                     #Wait for a new Client if the current one has disconnect
                     if self.log_file is not None :
-                                self.log_file.info(f"Stream {self.stream_id} : Client disconnected  {e}")
+                        self.log_file.info(f"Stream {self.stream_id} : Client disconnected  {e}")
                     while True:
                         try:
                            
@@ -754,7 +753,7 @@ class Stream:
         return 0
     
     def datalink_tcp_client_task(self, tcp: socket.socket, linked_data: list[queue.Queue], update_linked_ports_queue: queue.Queue 
-                              ,  data_to_show : queue.Queue):
+                              ,  data_to_show : queue.Queue , logger):
         """
         The task for data link Stream using TCP communication.
 
@@ -788,25 +787,26 @@ class Stream:
                 if conn  is not None :
                     #Read input data 
                     try:
-                        incoming_data = tcp.recv(4096).decode(encoding='ISO-8859-1')
+                        incoming_data = tcp.recv(4096)
                         temp_incoming_tranfert += len(incoming_data)
                         if len(incoming_data) == 0:
                             conn = None
                     except socket.timeout:
                         incoming_data = ""
-                    except ConnectionResetError : 
+                    except ConnectionResetError :
                         conn = None
-                    except BrokenPipeError : 
+                    except BrokenPipeError :
                         conn = None
-                    # Print if show data 
-                    if self.show_incoming_data.is_set() and len(incoming_data) != 0:
-                        data_to_show.put(incoming_data)
+                    # Print if show data
+                    if len(incoming_data) != 0:
                         if self.logging:
-                            self.logger.write(incoming_data)
-                    # Send data to linked stream
-                    if linked_ports is not None and len(incoming_data) != 0:
-                        for portid in linked_ports:
-                            linked_data[portid].put(incoming_data)
+                            logger.write(incoming_data.decode(encoding='ISO-8859-1'))
+                        if self.show_incoming_data.is_set():
+                            data_to_show.put(incoming_data.decode(encoding='ISO-8859-1'))
+                        # Send data to linked stream
+                        if linked_ports is not None:
+                            for portid in linked_ports:
+                                linked_data[portid].put(incoming_data)
                     # Output data comming from other streams
                     if not linked_data[self.stream_id].empty():
                         returnedValue = task_send_command(linked_data[self.stream_id],tcp,self.show_outgoing_data.is_set(),data_to_show=data_to_show,logger=self.logger,line_termination=self.line_termination)
@@ -846,7 +846,7 @@ class Stream:
         return 0
                     
     def datalink_udp_task(self, udp: socket.socket, linked_data: list[queue.Queue], update_linked_ports_queue: queue.Queue 
-                           , data_to_show : queue.Queue ):
+                           , data_to_show : queue.Queue, logger ):
         """
         Task for data link Stream using UDP communication.
         """
@@ -885,18 +885,19 @@ class Stream:
                     if self.udp_settings.dataflow.value in (1, 2):
                         try :
                             bytes_address_pair = udp.recvfrom(4096)
-                            incoming_data = bytes_address_pair[0].decode(encoding='ISO-8859-1')
+                            incoming_data = bytes_address_pair[0]
                             temp_incoming_tranfert += len(incoming_data)
                         except socket.timeout :
                             incoming_data = ""
-                        if self.show_incoming_data.is_set() and len(incoming_data) != 0:
-                            data_to_show.put(incoming_data)
-                            if self.logging:
-                                self.logger.write(incoming_data)
+                        if len(incoming_data) != 0:
+                            if self.show_incoming_data.is_set():
+                                data_to_show.put(incoming_data.decode(encoding='ISO-8859-1'))
+                                if self.logging:
+                                    logger.write(incoming_data.decode(encoding='ISO-8859-1'))
 
-                        if linked_ports is not None and len(incoming_data) != 0:
-                            for port in linked_ports:
-                                linked_data[port].put(incoming_data)
+                            if linked_ports is not None :
+                                for port in linked_ports:
+                                    linked_data[port].put(incoming_data)
 
                     if self.udp_settings.dataflow.value in (0, 2):
                         if not linked_data[self.stream_id].empty():
@@ -930,7 +931,7 @@ class Stream:
         return 0
     
     def datalink_ntrip_task(self, ntrip : NtripClient, linked_data: list[queue.Queue], update_linked_ports_queue: queue.Queue 
-                           , data_to_show : queue.Queue ):
+                           , data_to_show : queue.Queue , logger):
         """
         Process the NTRIP data received from the NTRIP client and send correction to other the linked streams .
 
@@ -966,29 +967,28 @@ class Stream:
             temp_incoming_tranfert ,temp_outgoing_tranfert,current_time =  task_data_transfer_rate(self , current_time , temp_incoming_tranfert , temp_outgoing_tranfert) 
             try:
                 if ntrip is not None:
-                    #Read input data 
+                    #Read input data
                     try:
-                        incoming_data = ntrip.socket.recv(4096).decode(encoding='ISO-8859-1')
+                        incoming_data = ntrip.socket.recv(4096)
                         temp_incoming_tranfert += len(incoming_data)
                     except socket.timeout:
                         incoming_data = ""
-                    except (socket.gaierror,socket.herror) as e : 
+                    except (socket.gaierror,socket.herror) as e :
                         raise e
-                    # Print data if show data input 
-                    if self.show_incoming_data.is_set() and len(incoming_data) != 0:
-                        data_to_show.put(incoming_data)
+                    # Print data if show data input
+                    if len(incoming_data) != 0:
                         if self.logging:
-                            self.logger.write(incoming_data)
-                        
-                    # Send input data to linked Streams
-                    if linked_ports is not None and len(incoming_data) != 0:
-                        for portid in linked_ports:
-                            portQueue: queue.Queue = linked_data[portid]
-                            portQueue.put(incoming_data)
+                            logger.write(str(incoming_data))
+                        if self.show_incoming_data.is_set():
+                            data_to_show.put(incoming_data.decode(encoding='ISO-8859-1'))
+                        # Send input data to linked Streams
+                        if linked_ports is not None:
+                            for portid in linked_ports:
+                                linked_data[portid].put(incoming_data.decode(encoding='ISO-8859-1'))
                     #Send output data comming from other streams and print data if showdata is set
                     if not linked_data[self.stream_id].empty():
                         returnedValue = task_send_command(linked_data[self.stream_id],ntrip ,self.show_outgoing_data.is_set(),data_to_show=data_to_show,logger=self.logger,line_termination=self.line_termination)
-                        if returnedValue is not None : 
+                        if returnedValue is not None :
                             temp_outgoing_tranfert += returnedValue
             except Exception as e:
                 self._exception_disconnect()
@@ -1069,6 +1069,7 @@ def task_update_linked_port(update_linked_ports_queue : queue.Queue , linked_por
             linked_ports.append(port)
     return linked_ports
 
+
 def task_send_command(linked_data : queue.Queue , stream  : Serial | socket.socket | NtripClient, show_data : bool = False ,
                       udp_send_address = None ,  data_to_show : queue.Queue = None ,
                       logger : TextIOWrapper = None , line_termination : str = "\r\n"):
@@ -1077,14 +1078,19 @@ def task_send_command(linked_data : queue.Queue , stream  : Serial | socket.sock
     """
     try :
         for _ in range(linked_data.qsize()):
-            outgoing_data : str = linked_data.get()
+            outgoing_data = linked_data.get()
             if isinstance(stream , Serial):
-                stream.write((outgoing_data+line_termination).encode(encoding='ISO-8859-1'))
+                
+                val = stream.write(outgoing_data)
+                constants.SAVEVALUE += val
+                print(constants.SAVEVALUE)
             elif isinstance(stream, socket.socket) and udp_send_address is None:
-                stream.sendall(outgoing_data.encode(encoding='ISO-8859-1')+ line_termination)
+                stream.sendall(outgoing_data)
             elif isinstance(stream, socket.socket) :
-                stream.sendto(outgoing_data.encode(encoding='ISO-8859-1') + line_termination, udp_send_address)
-            elif isinstance(stream, NtripClient):
+                stream.sendto(outgoing_data, udp_send_address)
+            elif isinstance(stream, NtripClient): 
+                if isinstance(outgoing_data , bytes):
+                    outgoing_data = outgoing_data.decode(encoding='ISO-8859-1')
                 if "GGA" in outgoing_data:
                     stream.send_nmea(outgoing_data)
             else : continue
