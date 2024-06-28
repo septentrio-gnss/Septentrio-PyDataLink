@@ -2,7 +2,7 @@
 
 # pyDatalink by Septentrio
 
-**Note : This tool is currently under testing. Feel free to provide feedback <a href="https://forms.office.com/e/UqdAs4hfF3 ">here</a> .**
+**Note : This tool is currently under testing. Feel free to provide feedback <a href="https://forms.office.com/e/UqdAs4hfF3 ">here</a> or file an issue in this Github repository.**
 ## AUTHORS
   
 | Name | GitHub |
