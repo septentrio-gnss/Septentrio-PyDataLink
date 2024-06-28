@@ -17,7 +17,7 @@
 
 ## DO YOU HAVE ANY QUESTIONS? CONTACT SEPTENTRIO SUPPORT TEAM
 
-| <a href="https://web.septentrio.com/GH-SSN-support ">Septentrio Support Page</a>|
+| <a href="https://web.septentrio.com/GH-SSN-support ">Septentrio Support Page</a></br>PyDataLink is not officially supported by Septentrio however Septentrio can provide great help around Septentrio GNSS receivers|
 |---|
 
 ## SEPTENTRIO LINKS FOR USERS
@@ -42,7 +42,9 @@
 
 # What is DataLink 
 
-Data Link is a software tool developed by Septentrio and is available as part of the RxTools suite. RxTools is a collection of GUI tools designed for monitoring and configuring Septentrio's receivers, logging data and downloading SBF data files, as well as analyzing and converting SBF data files to different formats.
+Data Link is a software tool developed by <a href"https://web.septentrio.com/GH-SSN-home">Septentrio</a> and is available as part of the RxTools suite. RxTools is a collection of GUI tools designed for monitoring and configuring <a href"https://web.septentrio.com/GH-SSN-home">Septentrio's</a> GNSS receivers, logging data and downloading SBF data files, as well as analyzing and converting SBF data files to different formats.
+
+<a href"https://web.septentrio.com/GH-SSN-home">Septentrio</a> is a leading provider of high-precision GNSS solutions known for delivering robust and reliable positioning technology across various industries.
 
 Data Link, within the RxTools suite, serves as a graphical communication terminal that enables users to establish connections with multiple devices and facilitate data transfer between them.
 
@@ -55,6 +57,16 @@ The second major feature of this version is that the code is entirely open sourc
 <img src="doc_sources/pyDatalink.PNG" >
 </div>
 <br>
+
+These are the major features of PyDataLink:
+ - Connecivity for up to 6 parallel connections: TCP , UDP , Serial: Handy for GNSS receivers or other sensors/systems
+ - Support for NTRIP Client including TLS support
+ - Logging of data passing through the connection
+ - Automatic configuration scrips at connection and/or disconnection (handy to automatically configure GNSS receivers or other sensors)
+ - Terminal Display on connections
+ - Redirection of data to multiple connections
+
+While the tool has been mainly tested with Septentrio GNSS receivers, it is generic enough to work with other systems (e.g. cell modems, radios, u-blox receivers, etc).
 
 # Installation
 
