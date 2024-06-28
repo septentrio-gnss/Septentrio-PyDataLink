@@ -87,12 +87,15 @@ class NtripClient:
             if self.log_file is not None :
                 self.log_file.debug("Create NTRIP Client socket")
             self.socket = self.ntrip_settings.connect()
-            self.connected = True
             if self.log_file is not None :
                 self.log_file.info("NTRIP Client socket Created")
             self._connect_request()
+            self.connected = True
         except NtripSettingsException as e:
+            self.close()
             self.connected = False
+            if self.log_file is not None :
+                self.log_file.error("Error while creating NTRIP Socket")
             raise e
 
     def send_nmea(self, nmea_message):

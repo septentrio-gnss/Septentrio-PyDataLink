@@ -101,7 +101,10 @@ class NtripSettings:
             if self.log_file is not None :
                 self.log_file.error("Invalid Hostname : hostname empty")
             raise InvalidHostnameError("Invalid Host Name or Host name Empty")
+        
         if self.tls :
+            if self.log_file is not None :
+                self.log_file.info("Openning tls socket connection with : %s : %s",self.host ,self.port)
             ntrip_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             if self.cert != "":
                 context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -123,6 +126,8 @@ class NtripSettings:
                 raise ConnectFailedError("Failed to open TLS socket") from e
         else :
             try:
+                if self.log_file is not None :
+                    self.log_file.info("Openning socket connection with : %s : %s",self.host,self.port)
                 ntrip_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 ntrip_socket.settimeout(5)
                 ntrip_socket.connect((self.host, self.port))
