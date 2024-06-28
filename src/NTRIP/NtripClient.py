@@ -140,8 +140,8 @@ class NtripClient:
         request += "Host: " + self.ntrip_settings.host + "\r\n"
         request += "User-Agent: NTRIP pydatalink Client\r\n"
         request += "Ntrip-Version: Ntrip/2.0\r\n"
-        if self.ntrip_settings.auth :
-            request+="Authorization: Basic " +  base64.b64encode((self.ntrip_settings.username + ":" + self.ntrip_settings.password).encode()).decode() + "\r\n"
+        # if self.ntrip_settings.auth :
+        #     request+="Authorization: Basic " +  base64.b64encode((self.ntrip_settings.username + ":" + self.ntrip_settings.password).encode()).decode() + "\r\n"
         request += "Connection: close\r\n\r\n"
 
         try :
