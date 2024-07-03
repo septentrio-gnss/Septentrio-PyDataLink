@@ -731,11 +731,11 @@ class Stream:
                         except Exception as e :
                             if self.stop_event.is_set():
                                 raise e 
-            except Exception as e:
+            except Exception as exc:
                 self._exception_disconnect()
                 if self.log_file is not None :
-                    self.log_file.error("Stream %i %s has been disconnected, error: %e",self.stream_id , self.stream_type , e )
-                raise StreamThreadException(f"Stream {self.stream_id} {self.stream_type} has been disconnected, error: {e}") from e
+                    self.log_file.error("Stream %i %s has been disconnected, error: %e",self.stream_id , self.stream_type , exc )
+                raise StreamThreadException(f"Stream {self.stream_id} {self.stream_type} has been disconnected, error: {exc}") from exc
             #Update current linked Streams list
             if not update_linked_ports_queue.empty():
                 linked_ports = task_update_linked_port(update_linked_ports_queue , linked_ports)
@@ -832,7 +832,7 @@ class Stream:
             
             # Update Current linked Stream list
             if not self.update_linked_ports_queue.empty():
-                task_update_linked_port(self.update_linked_ports,linked_ports)
+                task_update_linked_port(update_linked_ports_queue,linked_ports)
         # Send Closeup command
         if self.log_file is not None :
             self.log_file.info("Stream %i : main loop ended ",self.stream_id )
