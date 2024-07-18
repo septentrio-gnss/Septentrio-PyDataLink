@@ -1,6 +1,6 @@
 <div align="center">
 
-# pyDatalink by Septentrio
+# PyDatalink by Septentrio
 
 **Note : This tool is currently under testing. Feel free to provide feedback <a href="https://forms.office.com/e/UqdAs4hfF3 ">here</a> or file an issue in this Github repository.**
 ## AUTHORS
@@ -50,7 +50,7 @@ Data Link, within the RxTools suite, serves as a graphical communication termina
 
 
 # What is PyDataLink
-Pydatalink is an application whose functions are similar to RxTools' Datalink, but whose special feature is that it is compatible with ARM and x86 systems. The idea of recreating a data link application came from the fact that the current version of Datalink is only compatible with x86 architectures and that cross-compiling it to support other architectures is complex because of the project's various dependencies.
+Pydatalink is an application whose functions are similar to RxTools' Datalink, but whose special feature is that it is compatible with ARM and x86 systems. The idea of recreating a data link application came from the fact that the current version of Datalink is only compatible with x86 architectures.
 
 The second major feature of this version is that the code is entirely open source, unlike the Datalink code. The aim of making the project available as open source is to allow the community to contribute to the development of the tool in order to integrate new functionalities.
 <div align="center">
