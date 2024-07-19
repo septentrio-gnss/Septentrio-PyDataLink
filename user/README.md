@@ -173,7 +173,12 @@ python pyDatalink.py --Mode CMD --Streams serial://COM7:115200:n:1:8:0#1 serial:
 
 # Terminal Interface
 <div align="center">
-<img src="doc_sources/Terminal_Interface.PNG" width="75%">
+<img src="doc_sources/TUR_animated.gif" >
+</div>
+<br>
+
+<div align="center">
+<img src="doc_sources/Terminal_Interface.PNG" width="60%">
 </div>
 <br>
 The project propose a menu-based TUI, providing a semi-graphical way to configure and use the app . To navigate through the menus, you can either use the arrow keys to select an option and press `enter`, or use the corresponding number key next to the menu item. Pressing the `q` key will always take you back or allow you to quit the application.
