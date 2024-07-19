@@ -34,7 +34,7 @@
 </div>
 
 <a href="https://youtu.be/AKUc9lmYKYs">
-         <img alt="Intro to PyDataLink" src="doc_resources/video_link.png" width=70%">
+         <img alt="Intro to PyDataLink" src="doc_sources/video_link.png" width=50%">
 </a>
 
 ## TABLE OF CONTENTS
