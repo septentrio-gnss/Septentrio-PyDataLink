@@ -31,11 +31,13 @@
 |----------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
 | <a href="https://web.septentrio.com/GH-SSN-contact ">Septentrio Contact Page</a> | <a href="https://web.septentrio.com/UBL-SSN-home">Septentrio Home Page</a> |
 
-</div>
 
-<a href="https://youtu.be/AKUc9lmYKYs">
-         <img alt="Intro to PyDataLink" src="doc_sources/video_link.png" width=50%">
-</a>
+</br>
+</br>
+<center>
+  <a href="https://youtu.be/AKUc9lmYKYs"> <img alt="Intro to PyDataLink" src="doc_sources/video_link.png" width=60%"></a>
+</center>
+</div>
 
 ## TABLE OF CONTENTS
 
