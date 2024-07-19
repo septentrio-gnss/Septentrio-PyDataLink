@@ -2,6 +2,11 @@
 
 # PyDatalink by Septentrio
 
+<div align="center">
+<img src="doc_sources/Official_Logo_1.jpg" >
+</div>
+<br>
+
 **Note : This tool is currently under testing. Feel free to provide feedback <a href="https://forms.office.com/e/UqdAs4hfF3 ">here</a> or file an issue in this Github repository.**
 ## AUTHORS
   
