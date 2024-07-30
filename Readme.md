@@ -27,9 +27,9 @@
 
 ## SEPTENTRIO LINKS FOR USERS
  
-| Contact                                                                          | Septentrio Home Page                                                        |
-|----------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
-| <a href="https://web.septentrio.com/GH-SSN-contact ">Septentrio Contact Page</a> | <a href="https://web.septentrio.com/UBL-SSN-home">Septentrio Home Page</a> |
+| Septentrio website                                    | Contact                                                          | Resources |
+| :-:                                                   | :-:                                                              | :-: |
+| [Septentrio home page](https://web.septentrio.com/GL-SSN-home) | [Septentrio contact page](https://web.septentrio.com/GH-SSN-contact) | [Septentrio resource page](https://web.septentrio.com/GH-SSN-support) |
 
 
 </br>
@@ -52,7 +52,7 @@
 
 # What is Septentrio's DataLink 
 
-Data Link is a software tool developed by <a href="https://web.septentrio.com/GH-SSN-home">Septentrio</a> and is available as part of the RxTools suite. RxTools is a collection of GUI tools designed for monitoring and configuring <a href="https://web.septentrio.com/GH-SSN-home">Septentrio's</a> GNSS receivers, logging data and downloading SBF data files, as well as analyzing and converting SBF data files to different formats.
+Data Link is a software tool developed by <a href="https://web.septentrio.com/GH-SSN-home">Septentrio</a> a manufacturer of GNSS receivers and is available as part of the RxTools suite. RxTools is a collection of GUI tools designed for monitoring and configuring <a href="https://web.septentrio.com/GH-SSN-home">Septentrio's</a> GNSS receivers, logging data and downloading SBF data files, as well as analyzing and converting SBF data files to different formats.
 
 <a href="https://web.septentrio.com/GH-SSN-home">Septentrio</a> is a leading provider of high-precision GNSS solutions known for delivering robust and reliable positioning technology across various industries.
 
